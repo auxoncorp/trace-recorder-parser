@@ -1,5 +1,5 @@
 use crate::snapshot::object_properties::{IsrPriority, ObjectHandle};
-use crate::snapshot::{Dts16, Timestamp};
+use crate::snapshot::Timestamp;
 use derive_more::{Deref, Display, Into};
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Into, Deref, Display)]
@@ -12,7 +12,6 @@ pub struct IsrEvent {
     pub handle: ObjectHandle,
     pub name: IsrName,
     pub priority: IsrPriority,
-    pub dts: Dts16,
     pub timestamp: Timestamp,
 }
 

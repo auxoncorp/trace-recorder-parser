@@ -1,6 +1,6 @@
 use crate::snapshot::event::user::{format_symbol_string, FormattedStringError};
 use crate::snapshot::event::*;
-use crate::snapshot::object_properties::{ObjectHandle, ObjectPropertyTable};
+use crate::snapshot::object_properties::{ObjectClass, ObjectHandle, ObjectPropertyTable};
 use crate::snapshot::symbol_table::{SymbolTable, SymbolTableEntryIndex};
 use crate::snapshot::{DifferentialTimestamp, Dts16, Dts8, Timestamp};
 use byteordered::{ByteOrdered, Endianness};
@@ -105,7 +105,6 @@ impl EventParser {
                     handle,
                     name: IsrName(obj.display_name().to_string()),
                     priority: obj.priority(),
-                    dts,
                     timestamp: self.get_timestamp(dts.into()),
                 };
                 Some((
@@ -135,7 +134,6 @@ impl EventParser {
                     name: TaskName(obj.display_name().to_string()),
                     state: obj.state(),
                     priority: obj.current_priority(),
-                    dts,
                     timestamp: self.get_timestamp(dts.into()),
                 };
                 Some((
@@ -146,6 +144,30 @@ impl EventParser {
                         _ /*EventType::TaskSwitchTaskResume*/ => Event::TaskResume(event),
                     },
                 ))
+            }
+
+            EventType::CreateObject(occ) => {
+                let handle = self.parse_generic_kernel_call(&record)?;
+                match occ.into_class() {
+                    ObjectClass::Task => {
+                        let obj = obj_props
+                            .task_object_properties
+                            .get(&handle)
+                            .ok_or(Error::ObjectLookup(handle))?;
+                        Some((
+                            event_type,
+                            Event::TaskCreate(TaskEvent {
+                                handle,
+                                name: TaskName(obj.display_name().to_string()),
+                                state: obj.state(),
+                                priority: obj.current_priority(),
+                                timestamp: self.accumulated_time,
+                            }),
+                        ))
+                    }
+                    // Other object classes not handled currently
+                    _ => Some((event_type, Event::Unknown(record))),
+                }
             }
 
             EventType::UserEvent(arg_record_cnt) => {
@@ -179,7 +201,6 @@ impl EventParser {
                 let _unused = r.read_u8()?;
                 let dts = Dts16(r.read_u16()?);
                 let event = LowPowerEvent {
-                    dts,
                     timestamp: self.get_timestamp(dts.into()),
                 };
                 Some((
@@ -202,8 +223,7 @@ impl EventParser {
                 Some((event_type, Event::Unknown(record)))
             }
 
-            EventType::CreateObject(_)
-            | EventType::Send(_)
+            EventType::Send(_)
             | EventType::Receive(_)
             | EventType::SendFromIsr(_)
             | EventType::ReceiveFromIsr(_) => {
@@ -402,13 +422,14 @@ impl EventParser {
     }
 
     /// Process the DTS portion of a record containing a `struct KernelCall`
-    fn parse_generic_kernel_call(&mut self, record: &EventRecord) -> Result<(), Error> {
+    fn parse_generic_kernel_call(&mut self, record: &EventRecord) -> Result<ObjectHandle, Error> {
         let mut r = ByteOrdered::runtime(record.as_slice(), self.endianness);
         let _event_code = r.read_u8()?;
-        let _obj_handle = r.read_u8()?;
+        let obj_handle =
+            ObjectHandle::new(r.read_u8()?.into()).ok_or(Error::InvalidObjectHandle)?;
         let dts = Dts8(r.read_u8()?);
         let _timestamp = self.get_timestamp(dts.into());
-        Ok(())
+        Ok(obj_handle)
     }
 
     /// Process the DTS portion of a record containing a `struct KernelCallWithParamAndHandle`
@@ -527,7 +548,6 @@ impl EventParser {
                 }
             };
             let event = UserEvent {
-                dts,
                 timestamp: self.get_timestamp(dts.into()),
                 channel,
                 formatted_string,

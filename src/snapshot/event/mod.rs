@@ -4,7 +4,9 @@ use derive_more::{Binary, Deref, Display, Into, LowerHex, Octal, UpperHex};
 pub use isr::{IsrBeginEvent, IsrEvent, IsrName, IsrResumeEvent};
 pub use low_power::{LowPowerBeginEvent, LowPowerEndEvent, LowPowerEvent};
 pub use parser::EventParser;
-pub use task::{TaskBeginEvent, TaskEvent, TaskName, TaskReadyEvent, TaskResumeEvent};
+pub use task::{
+    TaskBeginEvent, TaskCreateEvent, TaskEvent, TaskName, TaskReadyEvent, TaskResumeEvent,
+};
 pub use user::{FormattedString, UserEvent, UserEventArgRecordCount, UserEventChannel};
 
 pub mod isr;
@@ -698,18 +700,24 @@ pub enum Event {
     IsrBegin(IsrBeginEvent),
     #[display(fmt = "IsrResume({_0})")]
     IsrResume(IsrResumeEvent),
+
     #[display(fmt = "TaskBegin({_0})")]
     TaskBegin(TaskBeginEvent),
     #[display(fmt = "TaskReady({_0})")]
     TaskReady(TaskReadyEvent),
     #[display(fmt = "TaskResume({_0})")]
     TaskResume(TaskResumeEvent),
+    #[display(fmt = "TaskCreate({_0})")]
+    TaskCreate(TaskCreateEvent),
+
     #[display(fmt = "LowPowerBegin({_0})")]
     LowPowerBegin(LowPowerBeginEvent),
     #[display(fmt = "LowPowerEnd({_0})")]
     LowPowerEnd(LowPowerEndEvent),
+
     #[display(fmt = "User({_0})")]
     User(UserEvent),
+
     #[display(fmt = "EventRecord({_0})")]
     Unknown(EventRecord),
 }

@@ -218,6 +218,10 @@ impl ObjectClassExt for TaskObjectClass {
     }
 }
 
+impl TaskObjectClass {
+    pub const STARTUP_TASK_NAME: &'static str = "(startup)";
+}
+
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Into, Display)]
 #[display(fmt = "{_0}")]
 pub struct TaskPriority(u8);

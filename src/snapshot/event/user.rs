@@ -1,5 +1,5 @@
 use crate::snapshot::symbol_table::{SymbolTable, SymbolTableEntryIndex};
-use crate::snapshot::{Dts8, Timestamp};
+use crate::snapshot::Timestamp;
 use byteordered::{ByteOrdered, Endianness};
 use derive_more::{Binary, Deref, Display, Into, LowerHex, Octal, UpperHex};
 use ordered_float::OrderedFloat;
@@ -42,7 +42,6 @@ pub enum UserEventChannel {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
 #[display(fmt = "[{timestamp}]:[{channel}]='{formatted_string}'")]
 pub struct UserEvent {
-    pub dts: Dts8,
     pub timestamp: Timestamp,
     pub channel: UserEventChannel,
     pub formatted_string: FormattedString,
