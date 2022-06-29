@@ -1,3 +1,5 @@
+#![deny(warnings, clippy::all)]
+
 use clap::Parser;
 use std::collections::BTreeSet;
 use std::fs::File;

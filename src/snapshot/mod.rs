@@ -1,4 +1,3 @@
-use byteordered::Endianness;
 use derive_more::{Display, Into};
 use tracing::warn;
 
@@ -80,6 +79,32 @@ impl KernelVersion {
     /// 0xAB_BA ([0xBA, 0xAB]) -> 0xBB
     fn join_inner_nibbles(&self) -> u8 {
         (self.0[0] >> 4) | ((self.0[1] & 0x0F) << 4)
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
+pub enum Endianness {
+    #[display(fmt = "little-endian")]
+    Little,
+    #[display(fmt = "big-endian")]
+    Big,
+}
+
+impl From<byteordered::Endianness> for Endianness {
+    fn from(e: byteordered::Endianness) -> Self {
+        match e {
+            byteordered::Endianness::Little => Endianness::Little,
+            byteordered::Endianness::Big => Endianness::Big,
+        }
+    }
+}
+
+impl From<Endianness> for byteordered::Endianness {
+    fn from(e: Endianness) -> byteordered::Endianness {
+        match e {
+            Endianness::Little => byteordered::Endianness::Little,
+            Endianness::Big => byteordered::Endianness::Big,
+        }
     }
 }
 

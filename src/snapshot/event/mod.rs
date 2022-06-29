@@ -232,7 +232,7 @@ pub enum EventType {
     // Note that user event code range is 0x98..=0xA7
     // Allow for 0-15 arguments (the number of arg *records* (not arg count) is added to event code)
     // num_arg_records = EventCode - 0x98
-    #[display(fmt = "USER_EVENT({_0})")]
+    #[display(fmt = "USER_EVENT")]
     UserEvent(UserEventArgRecordCount),
 
     // EVENTGROUP_SYS
@@ -368,7 +368,7 @@ pub enum EventType {
     // EVENTGROUP_STREAMBUFFER_DIV
     #[display(fmt = "STREAMBUFFER_RESET")]
     StreambufferReset,
-    #[display(fmt = "MESSAGEBUFFER_")]
+    #[display(fmt = "MESSAGEBUFFER_RESET")]
     MessagebufferReset,
     #[display(fmt = "STREAMBUFFER_OBJCLOSE_NAME")]
     StreambufferObjectCloseName,
@@ -389,7 +389,7 @@ pub enum EventType {
     UnusedStack,
 
     // Variant to handle unknown/unsupported event code
-    #[display(fmt = "Unknown(0x{_0:02X})")]
+    #[display(fmt = "UNKNOWN")]
     Unknown(EventCode),
 }
 

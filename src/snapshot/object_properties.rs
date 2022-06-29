@@ -116,7 +116,7 @@ pub struct ObjectProperties<C: ObjectClassExt> {
 }
 
 impl<C: ObjectClassExt> ObjectProperties<C> {
-    const UNNAMED_OBJECT: &'static str = "<unnamed>";
+    pub const UNNAMED_OBJECT: &'static str = "<unnamed>";
 
     pub(crate) fn new(name: Option<String>, properties: [u8; 4]) -> Self {
         ObjectProperties {

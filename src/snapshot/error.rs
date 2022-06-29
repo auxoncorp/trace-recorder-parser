@@ -21,6 +21,9 @@ pub enum Error {
     #[error("User event buffers are not supported (TRC_CFG_USE_SEPARATE_USER_EVENT_BUFFER == 1)")]
     UnsupportedUserEventBuffer,
 
+    #[error("16-bit handles are not supported (TRC_CFG_USE_16BIT_OBJECT_HANDLES == 1)")]
+    Unsupported16bitHandles,
+
     #[error(transparent)]
     Parser(#[from] parser::Error),
 

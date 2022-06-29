@@ -7,8 +7,10 @@ use crate::snapshot::symbol_table::{
     SymbolCrc6, SymbolString, SymbolTable, SymbolTableEntry, SymbolTableEntryIndex,
 };
 use crate::snapshot::time::Frequency;
-use crate::snapshot::{Error, FloatEncoding, KernelPortIdentity, KernelVersion, OffsetBytes};
-use byteordered::{ByteOrdered, Endianness};
+use crate::snapshot::{
+    Endianness, Error, FloatEncoding, KernelPortIdentity, KernelVersion, OffsetBytes,
+};
+use byteordered::ByteOrdered;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::io::{Read, Seek, SeekFrom};
 use tracing::{debug, error, warn};
@@ -24,18 +26,18 @@ pub struct RecorderData {
     pub num_events: u32,
     pub max_events: u32,
     pub next_free_index: u32,
-    pub buffer_is_full: u32,
+    pub buffer_is_full: bool,
     pub frequency: Frequency,
     pub abs_time_last_event: u32,
     pub abs_time_last_event_second: u32,
-    pub recorder_active: u32,
+    pub recorder_active: bool,
     pub isr_tail_chaining_threshold: u32,
     pub heap_mem_usage: u32,
     pub is_using_16bit_handles: bool,
     pub object_property_table: ObjectPropertyTable,
     pub symbol_table: SymbolTable,
     pub float_encoding: FloatEncoding,
-    pub internal_error_occured: u32,
+    pub internal_error_occured: bool,
     pub system_info: String,
 
     /// Offset of the recorder data start markers
@@ -90,7 +92,7 @@ impl RecorderData {
         let irq_priority_order = r.read_u8()?;
 
         // The remaining fields are endian-aware
-        let mut r = ByteOrdered::new(r.into_inner(), endianness);
+        let mut r = ByteOrdered::new(r.into_inner(), byteordered::Endianness::from(endianness));
         let filesize = r.read_u32()?;
         debug!(filesize = filesize, "Found recorder data region size");
 
@@ -108,6 +110,10 @@ impl RecorderData {
         let heap_mem_usage = r.read_u32()?;
         DebugMarker::Marker0.read(&mut r)?;
         let is_using_16bit_handles = r.read_u32()? != 0;
+
+        if is_using_16bit_handles {
+            return Err(Error::Unsupported16bitHandles);
+        }
 
         if frequency.is_unitless() {
             warn!("Time base frequency is zero, units will be in ticks only");
@@ -435,11 +441,11 @@ impl RecorderData {
             num_events,
             max_events,
             next_free_index,
-            buffer_is_full,
+            buffer_is_full: buffer_is_full != 0,
             frequency,
             abs_time_last_event,
             abs_time_last_event_second,
-            recorder_active,
+            recorder_active: recorder_active != 0,
             isr_tail_chaining_threshold,
             heap_mem_usage,
             is_using_16bit_handles,
@@ -456,7 +462,7 @@ impl RecorderData {
             },
             symbol_table: SymbolTable { symbols },
             float_encoding,
-            internal_error_occured,
+            internal_error_occured: internal_error_occured != 0,
             system_info,
 
             // Internal stuff
@@ -481,7 +487,7 @@ impl RecorderData {
         &'r self,
         r: &'r mut R,
     ) -> Result<impl Iterator<Item = Result<(EventType, Event), Error>> + 'r, Error> {
-        let mut parser = EventParser::new(self.endianness);
+        let mut parser = EventParser::new(self.endianness.into());
         let iter = self.event_records(r)?.filter_map(move |item| match item {
             Ok(er) => match parser
                 .parse(&self.object_property_table, &self.symbol_table, er)
