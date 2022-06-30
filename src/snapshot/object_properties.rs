@@ -262,7 +262,7 @@ pub struct IsrPriority(u8);
 
 impl ObjectProperties<IsrObjectClass> {
     pub fn priority(&self) -> IsrPriority {
-        IsrPriority(self.properties[0])
+        IsrPriority(self.properties[1])
     }
 }
 
