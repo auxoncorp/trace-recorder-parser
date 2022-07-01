@@ -3,6 +3,7 @@ use crate::snapshot::Timestamp;
 use byteordered::{ByteOrdered, Endianness};
 use derive_more::{Binary, Deref, Display, Into, LowerHex, Octal, UpperHex};
 use ordered_float::OrderedFloat;
+use std::fmt::Write as _;
 use std::io;
 use thiserror::Error;
 use tracing::warn;
@@ -152,7 +153,7 @@ pub(crate) fn format_symbol_string(
                 }
             };
 
-            formatted_string.push_str(&format!("{arg}"));
+            let _ = write!(formatted_string, "{arg}");
             args.push(arg);
 
             found_format_specifier = false;
