@@ -23,6 +23,7 @@ pub struct RecorderData {
     pub minor_version: u8,
     pub irq_priority_order: u8,
     pub filesize: u32,
+    // Note that num_events can be greater than max_events when the buffer is full/overwritten
     pub num_events: u32,
     pub max_events: u32,
     pub next_free_index: u32,
@@ -475,8 +476,9 @@ impl RecorderData {
         &self,
         r: &'r mut R,
     ) -> Result<impl Iterator<Item = Result<EventRecord, Error>> + 'r, Error> {
+        let num_events = std::cmp::min(self.num_events, self.max_events);
         r.seek(SeekFrom::Start(self.event_data_offset))?;
-        Ok((0..self.num_events).into_iter().map(|_| {
+        Ok((0..num_events).into_iter().map(|_| {
             let mut record = [0; EventRecord::SIZE];
             r.read_exact(&mut record)?;
             Ok(EventRecord::new(record))
