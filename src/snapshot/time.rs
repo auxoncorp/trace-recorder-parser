@@ -32,6 +32,10 @@ impl Frequency {
     pub fn is_unitless(&self) -> bool {
         self.0 == 0
     }
+
+    pub fn get_raw(&self) -> u32 {
+        self.0
+    }
 }
 
 /// Timestamp (in ticks).
@@ -63,11 +67,13 @@ impl Timestamp {
         Self(0)
     }
 
-    pub fn ticks(&self) -> u64 {
+    pub fn get_raw(&self) -> u64 {
         self.0
     }
 
-    // TODO - add time base/Frequency conversions for units
+    pub fn ticks(&self) -> u64 {
+        self.get_raw()
+    }
 }
 
 impl ops::Add<DifferentialTimestamp> for Timestamp {
@@ -205,7 +211,6 @@ pub struct Dts8(pub(crate) u8);
 #[display(fmt = "{_0}")]
 pub struct Dts16(pub(crate) u16);
 
-// TODO - add more time tests, Frequency and time base conversions
 #[cfg(test)]
 mod test {
     use super::*;
@@ -226,5 +231,24 @@ mod test {
 
         accumulated_time += dts_for_next_event;
         assert_eq!(accumulated_time.ticks(), 0x00_03_5F_D5 + 0x0F);
+    }
+
+    #[test]
+    fn differential_time_xts8() {
+        let mut accumulated_time = Timestamp::zero();
+        accumulated_time.0 += 0x0F;
+        assert_eq!(accumulated_time.ticks(), 0x0F);
+
+        let xts_16 = 0x11_22;
+        let xts_8 = 0xE1;
+        let mut dts_for_next_event = DifferentialTimestamp::from_xts8(xts_8, xts_16);
+        assert_eq!(dts_for_next_event.ticks(), 0xE1_11_22_00);
+
+        let dts = Dts8(0x33);
+        dts_for_next_event += dts;
+        assert_eq!(dts_for_next_event.ticks(), 0xE1_11_22_33);
+
+        accumulated_time += dts_for_next_event;
+        assert_eq!(accumulated_time.ticks(), 0xE1_11_22_33 + 0x0F);
     }
 }
