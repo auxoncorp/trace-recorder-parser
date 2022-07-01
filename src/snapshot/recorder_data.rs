@@ -472,20 +472,48 @@ impl RecorderData {
         })
     }
 
-    pub fn event_records<'r, R: Read + Seek>(
-        &self,
+    pub fn event_records<'r, R: Read + Seek + Send>(
+        &'r self,
         r: &'r mut R,
-    ) -> Result<impl Iterator<Item = Result<EventRecord, Error>> + 'r, Error> {
-        let num_events = std::cmp::min(self.num_events, self.max_events);
-        r.seek(SeekFrom::Start(self.event_data_offset))?;
-        Ok((0..num_events).into_iter().map(|_| {
-            let mut record = [0; EventRecord::SIZE];
-            r.read_exact(&mut record)?;
-            Ok(EventRecord::new(record))
-        }))
+    ) -> Result<Box<dyn Iterator<Item = Result<EventRecord, Error>> + Send + 'r>, Error> {
+        if (self.num_events < self.max_events) || ((self.num_events % self.max_events) == 0) {
+            // Buffer is still still contiguous, can iterate from start of memory
+            let num_events_clamped = std::cmp::min(self.num_events, self.max_events);
+            r.seek(SeekFrom::Start(self.event_data_offset))?;
+            Ok(Box::new((0..num_events_clamped).into_iter().map(|_| {
+                let mut record = [0; EventRecord::SIZE];
+                r.read_exact(&mut record)?;
+                Ok(EventRecord::new(record))
+            })))
+        } else {
+            // Buffer full and has wrapped, chain the two regions together
+            // starting at the tail to end of the buffer region, then start
+            // of the memory region to head
+
+            // Seek to the tail
+            let num_tail_region_events = self.max_events - self.next_free_index;
+            let tail_offset = self.next_free_index * EventRecord::SIZE as u32;
+            r.seek(SeekFrom::Start(
+                self.event_data_offset + u64::from(tail_offset),
+            ))?;
+
+            let iter = (0..self.max_events).into_iter().map(move |event_index| {
+                let mut record = [0; EventRecord::SIZE];
+                r.read_exact(&mut record)?;
+
+                // Last tail record, seek to the start of the memory region for head region
+                if event_index + 1 == num_tail_region_events {
+                    r.seek(SeekFrom::Start(self.event_data_offset))?;
+                }
+
+                Ok(EventRecord::new(record))
+            });
+
+            Ok(Box::new(iter))
+        }
     }
 
-    pub fn events<'r, R: Read + Seek>(
+    pub fn events<'r, R: Read + Seek + Send>(
         &'r self,
         r: &'r mut R,
     ) -> Result<impl Iterator<Item = Result<(EventType, Event), Error>> + 'r, Error> {
