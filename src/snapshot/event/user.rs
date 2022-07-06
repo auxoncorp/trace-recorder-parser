@@ -34,10 +34,21 @@ impl UserEventArgRecordCount {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
 pub enum UserEventChannel {
-    #[display(fmt = "default")]
+    #[display(fmt = "{}", UserEventChannel::DEFAULT)]
     Default,
     #[display(fmt = "{_0}")]
     Custom(String),
+}
+
+impl UserEventChannel {
+    pub const DEFAULT: &'static str = "default";
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            UserEventChannel::Default => Self::DEFAULT,
+            UserEventChannel::Custom(s) => s.as_str(),
+        }
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
