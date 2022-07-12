@@ -6,9 +6,8 @@ use std::fs::File;
 use std::path::PathBuf;
 use trace_recorder_parser::snapshot::RecorderData;
 
-/// Parse snapshot data from memory dump file
 #[derive(Parser, Debug, Clone)]
-#[clap(version, about, long_about = None)]
+#[clap(name = "snapshot example", version, about = "Parse snapshot data from memory dump file", long_about = None)]
 pub struct Opts {
     /// Skip parsing the events
     #[clap(long)]
