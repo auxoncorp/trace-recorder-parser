@@ -39,7 +39,11 @@ impl Frequency {
 }
 
 /// Timestamp (in ticks).
-/// Stores accumulated differential timestamps.
+/// Stores accumulated differential timestamps in snapshot mode and device timer instant
+/// in streaming mode.
+///
+/// Note that in streaming mode this can rollover. `StreamingInstant` can be used to
+/// track the rollovers.
 #[derive(
     Copy,
     Clone,
@@ -99,7 +103,7 @@ impl ops::AddAssign<DifferentialTimestamp> for Timestamp {
 
 /// Time (in ticks) since the previous event in the recorder log.
 /// Can be up to 4 bytes in size, depending on how many DTS bytes are
-/// available in the event at hand and how much time has ellasped since
+/// available in the event at hand and how much time has elapsed since
 /// the previous event.
 #[derive(
     Copy,
@@ -211,6 +215,39 @@ pub struct Dts8(pub(crate) u8);
 #[display(fmt = "{_0}")]
 pub struct Dts16(pub(crate) u16);
 
+/// A monotonic clock measurement in ticks for tracking rollovers
+/// of streaming protocol timestamps.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
+#[display(fmt = "{}", "self.to_timestamp()")]
+pub struct StreamingInstant {
+    lower: u32,
+    upper: u32,
+}
+
+impl StreamingInstant {
+    pub fn zero() -> Self {
+        Self { lower: 0, upper: 0 }
+    }
+
+    pub fn elapsed(&mut self, now: Timestamp) -> Timestamp {
+        // Streaming protocol timestamps are always 32 bits
+        let now = now.0 as u32;
+
+        // Check for rollover on the lower
+        if now < self.lower {
+            self.upper += 1;
+        }
+
+        self.lower = now;
+
+        self.to_timestamp()
+    }
+
+    pub fn to_timestamp(&self) -> Timestamp {
+        Timestamp(u64::from(self.upper) << 32 | u64::from(self.lower))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -250,5 +287,20 @@ mod test {
 
         accumulated_time += dts_for_next_event;
         assert_eq!(accumulated_time.ticks(), 0xE1_11_22_33 + 0x0F);
+    }
+
+    #[test]
+    fn streaming_instant_rollover() {
+        // 5 ms before rollover
+        let t0 = Timestamp(4_294_967_290);
+
+        // 10 ms after rollover
+        let t1 = Timestamp(10);
+
+        let mut instant = StreamingInstant::zero();
+        assert_eq!(instant.elapsed(t0), t0);
+
+        let t2 = instant.elapsed(t1);
+        assert_eq!(t0.ticks() + 16, t2.ticks());
     }
 }

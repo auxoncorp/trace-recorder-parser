@@ -1,22 +1,21 @@
 use crate::snapshot::event::{Event, EventParser, EventRecord, EventType};
 use crate::snapshot::markers::{DebugMarker, MarkerBytes};
-use crate::snapshot::object_properties::{
-    ObjectClass, ObjectHandle, ObjectProperties, ObjectPropertyTable,
-};
-use crate::snapshot::symbol_table::{
-    SymbolCrc6, SymbolString, SymbolTable, SymbolTableEntry, SymbolTableEntryIndex,
-};
-use crate::snapshot::time::Frequency;
-use crate::snapshot::{
-    Endianness, Error, FloatEncoding, KernelPortIdentity, KernelVersion, OffsetBytes,
+use crate::snapshot::object_properties::{ObjectProperties, ObjectPropertyTable};
+use crate::snapshot::symbol_table::{SymbolCrc6, SymbolTable};
+use crate::snapshot::Error;
+use crate::time::Frequency;
+use crate::types::{
+    Endianness, FloatEncoding, KernelPortIdentity, KernelVersion, ObjectClass, ObjectHandle,
+    OffsetBytes, Protocol, TrimmedString,
 };
 use byteordered::ByteOrdered;
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 use std::io::{Read, Seek, SeekFrom};
 use tracing::{debug, error, warn};
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct RecorderData {
+    pub protocol: Protocol,
     pub kernel_version: KernelVersion,
     pub kernel_port: KernelPortIdentity,
     pub endianness: Endianness,
@@ -88,6 +87,10 @@ impl RecorderData {
 
         if kernel_port != KernelPortIdentity::FreeRtos {
             warn!("Kernel port {kernel_port} is not officially supported");
+        }
+
+        if minor_version != 6 {
+            warn!("Version {minor_version} is not officially supported");
         }
 
         let irq_priority_order = r.read_u8()?;
@@ -229,10 +232,7 @@ impl RecorderData {
                 let name = if tmp_buffer[0] == 0x01 {
                     None
                 } else {
-                    String::from_utf8_lossy(tmp_buffer.make_contiguous())
-                        .trim_end_matches(char::from(0))
-                        .to_string()
-                        .into()
+                    Some(TrimmedString::from_raw(tmp_buffer.make_contiguous()).into())
                 };
 
                 // Read properties
@@ -243,8 +243,8 @@ impl RecorderData {
 
                 // SAFETY: we initialize the raw_obj_handle to 1 above and only ever
                 // increment
-                let obj_handle = ObjectHandle::new(raw_obj_handle).unwrap();
-                raw_obj_handle += 1;
+                let obj_handle = ObjectHandle::new_unchecked(raw_obj_handle);
+                raw_obj_handle = raw_obj_handle.saturating_add(1);
 
                 match obj_class {
                     ObjectClass::Queue => {
@@ -337,7 +337,7 @@ impl RecorderData {
         }
 
         // Read in the populated symbol table entries
-        let mut symbols = BTreeSet::new();
+        let mut symbol_table = SymbolTable::default();
         while r.stream_position()? < end_of_symbol_entries {
             let start_of_symbol_table_entry = r.stream_position()?;
 
@@ -363,15 +363,15 @@ impl RecorderData {
                 }
             }
             let crc = SymbolCrc6::new(tmp_buffer.make_contiguous());
-            symbols.insert(SymbolTableEntry {
-                index: SymbolTableEntryIndex::new(
-                    ((start_of_symbol_table_entry - start_of_symbol_table_bytes) & 0xFFFF) as u16,
+            symbol_table.insert(
+                ObjectHandle::new(
+                    ((start_of_symbol_table_entry - start_of_symbol_table_bytes) & 0xFFFF) as u32,
                 )
                 .ok_or(Error::InvalidSymbolTableIndex(start_of_symbol_table_entry))?,
-                channel_index: SymbolTableEntryIndex::new(channel),
+                ObjectHandle::new(channel.into()),
                 crc,
-                symbol: SymbolString::from_raw(tmp_buffer.make_contiguous()),
-            });
+                TrimmedString::from_raw(tmp_buffer.make_contiguous()).into(),
+            );
         }
 
         // Seek past the unused symbol table entries
@@ -402,9 +402,7 @@ impl RecorderData {
         tmp_buffer.clear();
         tmp_buffer.resize(NUM_SYSTEM_INFO_BYTES, 0);
         r.read_exact(tmp_buffer.make_contiguous())?;
-        let system_info = String::from_utf8_lossy(tmp_buffer.make_contiguous())
-            .trim_end_matches(char::from(0))
-            .to_string();
+        let system_info = TrimmedString::from_raw(tmp_buffer.make_contiguous()).0;
         if !system_info.is_empty() {
             debug!(system_info = %system_info, "Found system info");
         }
@@ -433,6 +431,7 @@ impl RecorderData {
         MarkerBytes::End.read(&mut r)?;
 
         Ok(RecorderData {
+            protocol: Protocol::Snapshot,
             kernel_version,
             kernel_port,
             endianness,
@@ -461,7 +460,7 @@ impl RecorderData {
                 stream_buffer_object_properties,
                 message_buffer_object_properties,
             },
-            symbol_table: SymbolTable { symbols },
+            symbol_table,
             float_encoding,
             internal_error_occured: internal_error_occured != 0,
             system_info,

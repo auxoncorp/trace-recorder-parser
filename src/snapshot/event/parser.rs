@@ -1,8 +1,11 @@
-use crate::snapshot::event::user::{format_symbol_string, FormattedStringError};
 use crate::snapshot::event::*;
-use crate::snapshot::object_properties::{ObjectClass, ObjectHandle, ObjectPropertyTable};
-use crate::snapshot::symbol_table::{SymbolTable, SymbolTableEntryIndex};
-use crate::snapshot::{DifferentialTimestamp, Dts16, Dts8, Timestamp};
+use crate::snapshot::object_properties::ObjectPropertyTable;
+use crate::snapshot::symbol_table::SymbolTable;
+use crate::time::{DifferentialTimestamp, Dts16, Dts8, Timestamp};
+use crate::types::{
+    format_symbol_string, FormattedString, FormattedStringError, IsrName, ObjectClass,
+    ObjectHandle, Protocol, UserEventChannel,
+};
 use byteordered::{ByteOrdered, Endianness};
 use derive_more::From;
 use std::io;
@@ -17,12 +20,12 @@ pub enum Error {
     #[error(
         "Found a user event with format string index {0} that doesn't exist in the symbol table"
     )]
-    FormatSymbolLookup(SymbolTableEntryIndex),
+    FormatSymbolLookup(ObjectHandle),
 
     #[error(
         "Found a user event with channel string index {0} that doesn't exist in the symbol table"
     )]
-    ChannelSymbolLookup(SymbolTableEntryIndex),
+    ChannelSymbolLookup(ObjectHandle),
 
     #[error(transparent)]
     FormattedString(#[from] FormattedStringError),
@@ -166,7 +169,7 @@ impl EventParser {
                         ))
                     }
                     // Other object classes not handled currently
-                    _ => Some((event_type, Event::Unknown(record))),
+                    _ => Some((event_type, Event::Unknown(self.accumulated_time, record))),
                 }
             }
 
@@ -176,7 +179,7 @@ impl EventParser {
                     .map(|(et, ue)| (et, Event::User(ue)))
             }
 
-            // N.B XTS events aren't surfaced to the user, since they're just added to
+            // NOTE XTS events aren't surfaced to the user, since they're just added to
             // fulfill the differential timestamps of actual events
             EventType::Xts8 => {
                 let mut r = ByteOrdered::runtime(record.as_slice(), self.endianness);
@@ -220,7 +223,7 @@ impl EventParser {
             // event records and return Event::Unknown
             EventType::NewTime => {
                 self.parse_generic_kernel_call_with_numeric_param(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::Send(_)
@@ -228,12 +231,12 @@ impl EventParser {
             | EventType::SendFromIsr(_)
             | EventType::ReceiveFromIsr(_) => {
                 self.parse_generic_kernel_call(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::CreateObjectFailed(_) => {
                 self.parse_generic_kernel_call_with_numeric_param(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::SendFailed(_)
@@ -245,24 +248,24 @@ impl EventParser {
             | EventType::Peek(_)
             | EventType::DeleteObject(_) => {
                 self.parse_generic_kernel_call(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::TaskDelayUntil | EventType::TaskDelay => {
                 self.parse_generic_kernel_call_with_numeric_param(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::TaskSuspend | EventType::TaskResume | EventType::TaskResumeFromIsr => {
                 self.parse_generic_kernel_call(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::TaskPrioritySet
             | EventType::TaskPriorityInherit
             | EventType::TaskPriorityDisinherit => {
                 self.parse_generic_kernel_call_with_param(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::PendFuncCall
@@ -270,17 +273,17 @@ impl EventParser {
             | EventType::PendFuncCallFailed
             | EventType::PendFuncCallFromIsrFailed => {
                 self.parse_generic_kernel_call(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::MemoryMallocSize | EventType::MemoryFreeSize => {
                 self.parse_generic_mem_size(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::TimerCreate | EventType::TimerDeleteObject => {
                 self.parse_generic_kernel_call(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::TimerStart
@@ -291,12 +294,12 @@ impl EventParser {
             | EventType::TimerResetFromIsr
             | EventType::TimerStopFromIsr => {
                 self.parse_generic_kernel_call_with_param(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::TimerCreateFailed => {
                 self.parse_generic_kernel_call_with_numeric_param(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::TimerStartFailed
@@ -308,17 +311,17 @@ impl EventParser {
             | EventType::TimerResetFromIsrFailed
             | EventType::TimerStopFromIsrFailed => {
                 self.parse_generic_kernel_call_with_param(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::EventGroupCreate | EventType::EventGroupDeleteObject => {
                 self.parse_generic_kernel_call(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::EventGroupCreateFailed => {
                 self.parse_generic_kernel_call_with_numeric_param(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::EventGroupSyncBlock
@@ -333,19 +336,19 @@ impl EventParser {
             | EventType::EventGroupSetBitsFromIsr
             | EventType::EventGroupSetBitsFromIsrFailed => {
                 self.parse_generic_kernel_call_with_param(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::TaskInstanceFinishedNextKse | EventType::TaskInstanceFinishedDirect => {
                 self.parse_generic_task_instance_status(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::TaskNotify
             | EventType::TaskNotifyFromIsr
             | EventType::TaskNotifyGiveFromIsr => {
                 self.parse_generic_kernel_call(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::TaskNotifyTake
@@ -355,12 +358,12 @@ impl EventParser {
             | EventType::TaskNotifyWaitBlock
             | EventType::TaskNotifyWaitFailed => {
                 self.parse_generic_kernel_call_with_param(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::TimerExpired => {
                 self.parse_generic_kernel_call(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::QueuePeekBlock
@@ -370,31 +373,31 @@ impl EventParser {
             | EventType::SemaphortPeekFailed
             | EventType::MutexPeekFailed => {
                 self.parse_generic_kernel_call(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::StreambufferReset | EventType::MessagebufferReset => {
                 self.parse_generic_kernel_call(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::MemoryMallocSizeFailed => {
                 self.parse_generic_mem_size(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             EventType::UnusedStack => {
                 self.parse_generic_kernel_call_with_param(&record)?;
-                Some((event_type, Event::Unknown(record)))
+                Some((event_type, Event::Unknown(self.accumulated_time, record)))
             }
 
             // Default case, pass back a raw event record
             //
-            // N.B. take extra care to handle DTS-carrying events
+            // NOTE take extra care to handle DTS-carrying events
             // elsewhere to maintain the accumulated time.
             //
             // This *must* only be for records that don't have DTS fields.
-            _ => Some((event_type, Event::Unknown(record))),
+            _ => Some((event_type, Event::Unknown(self.accumulated_time, record))),
         })
     }
 
@@ -510,17 +513,17 @@ impl EventParser {
             let event_type = EventType::from(event_code);
             let dts = Dts8(r.read_u8()?);
             let format_string_index =
-                SymbolTableEntryIndex::new(r.read_u16()?).ok_or(Error::InvalidSymbolTableIndex)?;
+                ObjectHandle::new(r.read_u16()?.into()).ok_or(Error::InvalidSymbolTableIndex)?;
 
             let sym_entry = symbol_table
-                .entry(format_string_index)
+                .get(format_string_index)
                 .ok_or(Error::FormatSymbolLookup(format_string_index))?;
 
             let channel = sym_entry
                 .channel_index
                 .and_then(|ci| {
                     symbol_table
-                        .entry(ci)
+                        .get(ci)
                         .map(|se| UserEventChannel::Custom(se.symbol.clone().into()))
                 })
                 .unwrap_or(UserEventChannel::Default);
@@ -534,7 +537,8 @@ impl EventParser {
                 .collect();
             let (formatted_string, args) = match format_symbol_string(
                 symbol_table,
-                self.endianness,
+                Protocol::Snapshot,
+                self.endianness.into(),
                 &sym_entry.symbol,
                 &arg_bytes,
             ) {

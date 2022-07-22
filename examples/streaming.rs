@@ -4,16 +4,16 @@ use clap::Parser;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::path::PathBuf;
-use trace_recorder_parser::snapshot::RecorderData;
+use trace_recorder_parser::streaming::RecorderData;
 
 #[derive(Parser, Debug, Clone)]
-#[clap(name = "snapshot example", version, about = "Parse snapshot data from memory dump file", long_about = None)]
+#[clap(name = "streaming example", version, about = "Parse streaming data from file", long_about = None)]
 pub struct Opts {
     /// Skip parsing the events
     #[clap(long)]
     pub no_events: bool,
 
-    /// Path to memory dump file
+    /// Path to streaming data file
     #[clap(value_parser)]
     pub path: PathBuf,
 }
@@ -41,14 +41,15 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
     try_init_tracing_subscriber()?;
 
     let mut f = File::open(&opts.path)?;
-    let desc = RecorderData::locate_and_parse(&mut f)?;
-    println!("{:#?}", desc);
+
+    let mut rd = RecorderData::read(&mut f)?;
+    println!("{:#?}", rd);
 
     if !opts.no_events {
         let mut observed_type_counters = BTreeMap::new();
 
-        for event in desc.events(&mut f)? {
-            let (event_type, event) = event?;
+        while let Some((event_code, event)) = rd.read_event(&mut f)? {
+            let event_type = event_code.event_type();
             println!("{event_type} : {event}");
             *observed_type_counters.entry(event_type).or_insert(0) += 1_u64;
         }

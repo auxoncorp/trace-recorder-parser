@@ -1,10 +1,12 @@
-use derive_more::{Binary, Deref, Display, Into, LowerHex, Octal, UpperHex};
-use std::collections::BTreeSet;
-use std::num::NonZeroU16;
+use crate::types::{ObjectHandle, SymbolString, SymbolTableExt};
+use derive_more::{Binary, Display, Into, LowerHex, Octal, UpperHex};
+use std::collections::BTreeMap;
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 pub struct SymbolTable {
-    pub symbols: BTreeSet<SymbolTableEntry>,
+    /// The key is the byte offset of this entry within the originating table in memory,
+    /// referenced by user event payloads
+    pub symbols: BTreeMap<ObjectHandle, SymbolTableEntry>,
 }
 
 impl SymbolTable {
@@ -12,49 +14,44 @@ impl SymbolTable {
     /// connecting all entries with the same 6 bit checksum
     pub(crate) const NUM_LATEST_ENTRY_OF_CHECKSUMS: usize = 64;
 
-    pub fn entry(&self, index: SymbolTableEntryIndex) -> Option<&SymbolTableEntry> {
-        self.symbols.iter().find(|s| s.index == index)
+    pub fn insert(
+        &mut self,
+        handle: ObjectHandle,
+        channel_index: Option<ObjectHandle>,
+        crc: SymbolCrc6,
+        symbol: SymbolString,
+    ) {
+        self.symbols.insert(
+            handle,
+            SymbolTableEntry {
+                channel_index,
+                crc,
+                symbol,
+            },
+        );
+    }
+
+    pub fn get(&self, handle: ObjectHandle) -> Option<&SymbolTableEntry> {
+        self.symbols.get(&handle)
+    }
+}
+
+impl SymbolTableExt for SymbolTable {
+    fn symbol(&self, handle: ObjectHandle) -> Option<&SymbolString> {
+        self.get(handle).map(|ste| &ste.symbol)
     }
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
 #[display(fmt = "{}", symbol)]
 pub struct SymbolTableEntry {
-    /// The byte offset of this entry within the originating table in memory,
-    /// referenced by user event payloads
-    pub index: SymbolTableEntryIndex,
     /// Reference to a symbol table entry, a label for vTracePrintF
     /// format strings only (the handle of the destination channel)
-    pub channel_index: Option<SymbolTableEntryIndex>,
+    pub channel_index: Option<ObjectHandle>,
     /// 6-bit CRC of the binary symbol (before lossy UTF8 string conversion)
     pub crc: SymbolCrc6,
     /// The symbol (lossy converted to UTF8)
     pub symbol: SymbolString,
-}
-
-#[derive(
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    Debug,
-    Into,
-    Display,
-    Binary,
-    Octal,
-    LowerHex,
-    UpperHex,
-)]
-#[display(fmt = "{_0}")]
-pub struct SymbolTableEntryIndex(pub(crate) NonZeroU16);
-
-impl SymbolTableEntryIndex {
-    pub(crate) fn new(index: u16) -> Option<Self> {
-        Some(SymbolTableEntryIndex(NonZeroU16::new(index)?))
-    }
 }
 
 #[derive(
@@ -83,15 +80,5 @@ impl SymbolCrc6 {
             crc += *b as u32;
         }
         Self((crc & 0x3F) as u8)
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Into, Deref, Display)]
-#[display(fmt = "{_0}")]
-pub struct SymbolString(pub(crate) String);
-
-impl SymbolString {
-    pub(crate) fn from_raw(s: &[u8]) -> Self {
-        Self(String::from_utf8_lossy(s).to_string())
     }
 }

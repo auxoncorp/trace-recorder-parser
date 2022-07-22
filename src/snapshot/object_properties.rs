@@ -1,7 +1,9 @@
-use derive_more::{Binary, Deref, Display, Into, LowerHex, Octal, UpperHex};
+use crate::types::{
+    IsrPriority, ObjectClass, ObjectHandle, Priority, TaskPriority, UNNAMED_OBJECT,
+};
+use derive_more::{Display, Into};
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
-use std::num::NonZeroU16;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct ObjectPropertyTable {
@@ -19,92 +21,8 @@ pub struct ObjectPropertyTable {
         BTreeMap<ObjectHandle, ObjectProperties<MessageBufferObjectClass>>,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
-pub enum ObjectClass {
-    #[display(fmt = "Queue")]
-    Queue = 0,
-    #[display(fmt = "Semaphore")]
-    Semaphore = 1,
-    #[display(fmt = "Mutex")]
-    Mutex = 2,
-    #[display(fmt = "Task")]
-    Task = 3,
-    #[display(fmt = "ISR")]
-    Isr = 4,
-    #[display(fmt = "Timer")]
-    Timer = 5,
-    #[display(fmt = "EventGroup")]
-    EventGroup = 6,
-    #[display(fmt = "StreamBuffer")]
-    StreamBuffer = 7,
-    #[display(fmt = "MessageBuffer")]
-    MessageBuffer = 8,
-}
-
-impl ObjectClass {
-    pub(crate) fn into_usize(self) -> usize {
-        self as _
-    }
-
-    pub(crate) fn enumerate() -> &'static [Self] {
-        use ObjectClass::*;
-        &[
-            Queue,
-            Semaphore,
-            Mutex,
-            Task,
-            Isr,
-            Timer,
-            EventGroup,
-            StreamBuffer,
-            MessageBuffer,
-        ]
-    }
-
-    pub(crate) fn properties_size(self) -> usize {
-        use ObjectClass::*;
-        match self {
-            Queue => 1,
-            Semaphore => 1,
-            Mutex => 1,
-            Task => 4,
-            Isr => 2,
-            Timer => 1,
-            EventGroup => 4,
-            StreamBuffer => 4,
-            MessageBuffer => 4,
-        }
-    }
-}
-
 pub trait ObjectClassExt {
     fn class() -> ObjectClass;
-}
-
-#[derive(
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    Debug,
-    Deref,
-    Into,
-    Display,
-    Binary,
-    Octal,
-    LowerHex,
-    UpperHex,
-)]
-#[display(fmt = "{_0}")]
-pub struct ObjectHandle(pub(crate) NonZeroU16);
-
-impl ObjectHandle {
-    pub(crate) fn new(handle: u16) -> Option<Self> {
-        Some(ObjectHandle(NonZeroU16::new(handle)?))
-    }
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
@@ -116,7 +34,7 @@ pub struct ObjectProperties<C: ObjectClassExt> {
 }
 
 impl<C: ObjectClassExt> ObjectProperties<C> {
-    pub const UNNAMED_OBJECT: &'static str = "<unnamed>";
+    pub const UNNAMED_OBJECT: &'static str = UNNAMED_OBJECT;
 
     pub(crate) fn new(name: Option<String>, properties: [u8; 4]) -> Self {
         ObjectProperties {
@@ -219,12 +137,8 @@ impl ObjectClassExt for TaskObjectClass {
 }
 
 impl TaskObjectClass {
-    pub const STARTUP_TASK_NAME: &'static str = "(startup)";
+    pub const STARTUP_TASK_NAME: &'static str = crate::types::STARTUP_TASK_NAME;
 }
-
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Into, Display)]
-#[display(fmt = "{_0}")]
-pub struct TaskPriority(u8);
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
 pub enum TaskState {
@@ -236,7 +150,7 @@ pub enum TaskState {
 
 impl ObjectProperties<TaskObjectClass> {
     pub fn current_priority(&self) -> TaskPriority {
-        TaskPriority(self.properties[0])
+        Priority(self.properties[0].into())
     }
 
     pub fn state(&self) -> TaskState {
@@ -256,13 +170,9 @@ impl ObjectClassExt for IsrObjectClass {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Into, Display)]
-#[display(fmt = "{_0}")]
-pub struct IsrPriority(u8);
-
 impl ObjectProperties<IsrObjectClass> {
     pub fn priority(&self) -> IsrPriority {
-        IsrPriority(self.properties[1])
+        Priority(self.properties[1].into())
     }
 }
 

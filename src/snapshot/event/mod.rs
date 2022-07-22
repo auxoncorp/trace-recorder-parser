@@ -1,13 +1,12 @@
-use crate::snapshot::object_properties::ObjectClass;
+use crate::time::Timestamp;
+use crate::types::{ObjectClass, TaskName, UserEventArgRecordCount};
 use derive_more::{Binary, Deref, Display, Into, LowerHex, Octal, UpperHex};
 
-pub use isr::{IsrBeginEvent, IsrEvent, IsrName, IsrResumeEvent};
+pub use isr::{IsrBeginEvent, IsrEvent, IsrResumeEvent};
 pub use low_power::{LowPowerBeginEvent, LowPowerEndEvent, LowPowerEvent};
 pub use parser::EventParser;
-pub use task::{
-    TaskBeginEvent, TaskCreateEvent, TaskEvent, TaskName, TaskReadyEvent, TaskResumeEvent,
-};
-pub use user::{FormattedString, UserEvent, UserEventArgRecordCount, UserEventChannel};
+pub use task::{TaskBeginEvent, TaskCreateEvent, TaskEvent, TaskReadyEvent, TaskResumeEvent};
+pub use user::UserEvent;
 
 pub mod isr;
 pub mod low_power;
@@ -389,7 +388,7 @@ pub enum EventType {
     UnusedStack,
 
     // Variant to handle unknown/unsupported event code
-    #[display(fmt = "UNKNOWN")]
+    #[display(fmt = "UNKNOWN({_0})")]
     Unknown(EventCode),
 }
 
@@ -719,7 +718,25 @@ pub enum Event {
     User(UserEvent),
 
     #[display(fmt = "EventRecord({_0})")]
-    Unknown(EventRecord),
+    Unknown(Timestamp, EventRecord),
+}
+
+impl Event {
+    pub fn timestamp(&self) -> Timestamp {
+        use Event::*;
+        match self {
+            IsrBegin(e) => e.timestamp,
+            IsrResume(e) => e.timestamp,
+            TaskBegin(e) => e.timestamp,
+            TaskReady(e) => e.timestamp,
+            TaskResume(e) => e.timestamp,
+            TaskCreate(e) => e.timestamp,
+            LowPowerBegin(e) => e.timestamp,
+            LowPowerEnd(e) => e.timestamp,
+            User(e) => e.timestamp,
+            Unknown(t, _e) => *t,
+        }
+    }
 }
 
 #[cfg(test)]

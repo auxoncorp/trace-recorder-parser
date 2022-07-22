@@ -1,4 +1,4 @@
-use crate::snapshot::Timestamp;
+use crate::time::Timestamp;
 use derive_more::Display;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]

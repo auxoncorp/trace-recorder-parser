@@ -1,6 +1,6 @@
 use crate::snapshot::event::parser;
 use crate::snapshot::markers::{DebugMarker, MarkerBytes};
-use crate::snapshot::OffsetBytes;
+use crate::types::OffsetBytes;
 use std::io;
 use thiserror::Error;
 
