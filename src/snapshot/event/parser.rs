@@ -3,8 +3,8 @@ use crate::snapshot::object_properties::ObjectPropertyTable;
 use crate::snapshot::symbol_table::SymbolTable;
 use crate::time::{DifferentialTimestamp, Dts16, Dts8, Timestamp};
 use crate::types::{
-    format_symbol_string, FormattedString, FormattedStringError, IsrName, ObjectClass,
-    ObjectHandle, Protocol, UserEventChannel,
+    format_symbol_string, FormatString, FormattedString, FormattedStringError, IsrName,
+    ObjectClass, ObjectHandle, Protocol, UserEventChannel,
 };
 use byteordered::{ByteOrdered, Endianness};
 use derive_more::From;
@@ -554,6 +554,7 @@ impl EventParser {
             let event = UserEvent {
                 timestamp: self.get_timestamp(dts.into()),
                 channel,
+                format_string: FormatString(sym_entry.symbol.0.clone()),
                 formatted_string,
                 args,
             };

@@ -2,8 +2,9 @@ use crate::streaming::event::*;
 use crate::streaming::{Error, ObjectDataTable, SymbolTable};
 use crate::time::{Frequency, Timestamp};
 use crate::types::{
-    format_symbol_string, Endianness, FormattedString, IsrName, ObjectClass, ObjectHandle,
-    Priority, Protocol, SymbolString, TaskName, TimerCounter, TrimmedString, UserEventChannel,
+    format_symbol_string, Endianness, FormatString, FormattedString, IsrName, ObjectClass,
+    ObjectHandle, Priority, Protocol, SymbolString, TaskName, TimerCounter, TrimmedString,
+    UserEventChannel,
 };
 use byteordered::ByteOrdered;
 use std::io::{self, Read};
@@ -383,7 +384,10 @@ impl EventParser {
                     Ok((fs, args)) => (fs, args),
                     Err(e) => {
                         error!("Failed to parse user event format string arguments, using the raw symbol instead. {e}");
-                        (FormattedString(format_string.into()), Default::default())
+                        (
+                            FormattedString(format_string.clone().into()),
+                            Default::default(),
+                        )
                     }
                 };
 
@@ -391,6 +395,7 @@ impl EventParser {
                     event_count,
                     timestamp,
                     channel,
+                    format_string: FormatString(format_string.0),
                     formatted_string,
                     args,
                 };

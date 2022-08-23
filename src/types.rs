@@ -350,6 +350,10 @@ pub enum Argument {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Into, Deref, Display)]
 #[display(fmt = "{_0}")]
+pub struct FormatString(pub(crate) String);
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Into, Deref, Display)]
+#[display(fmt = "{_0}")]
 pub struct FormattedString(pub(crate) String);
 
 #[derive(Debug, Error)]

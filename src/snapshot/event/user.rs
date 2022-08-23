@@ -1,5 +1,5 @@
 use crate::time::Timestamp;
-use crate::types::{Argument, FormattedString, UserEventChannel};
+use crate::types::{Argument, FormatString, FormattedString, UserEventChannel};
 use derive_more::Display;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
@@ -7,6 +7,7 @@ use derive_more::Display;
 pub struct UserEvent {
     pub timestamp: Timestamp,
     pub channel: UserEventChannel,
+    pub format_string: FormatString,
     pub formatted_string: FormattedString,
     pub args: Vec<Argument>,
 }
