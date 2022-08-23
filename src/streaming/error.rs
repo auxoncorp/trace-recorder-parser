@@ -45,6 +45,9 @@ pub enum Error {
     )]
     InvalidTsConfigEvent(EventId),
 
+    #[error("TsConfig event contains an invalid timer counter type {0}")]
+    InvalidTimerCounter(u32),
+
     #[error("Found an event with object handle {0} that doesn't exist in the symbol table")]
     ObjectSymbolLookup(ObjectHandle),
 

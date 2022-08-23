@@ -73,12 +73,10 @@ impl SymbolTable {
 
         let mut r = ByteOrdered::new(r, byteordered::Endianness::from(endianness));
         let mut symbol_table = SymbolTable::default();
-        let mut buf = Vec::with_capacity(symbol_size);
+        let mut buf = vec![0; symbol_size - 4];
 
         for _idx in 0..symbol_count {
             let address = r.read_u32()?;
-            buf.clear();
-            buf.resize(symbol_size - 4, 0);
             r.read_exact(&mut buf)?;
             if let Some(oh) = ObjectHandle::new(address) {
                 let symbol = TrimmedString::from_raw(&buf).into();

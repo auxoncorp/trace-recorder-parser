@@ -482,6 +482,36 @@ enum SubSpecifier {
     Octet,
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
+pub enum TimerCounter {
+    FreeRunning32Incr,
+    FreeRunning32Decr,
+    OsIncr,
+    OsDecr,
+    CustomIncr,
+    CustomDecr,
+}
+
+impl TimerCounter {
+    pub fn is_increment(&self) -> bool {
+        use TimerCounter::*;
+        matches!(self, FreeRunning32Incr | OsIncr | CustomIncr)
+    }
+
+    pub(crate) fn from_hwtc_type(tc: u32) -> Option<Self> {
+        use TimerCounter::*;
+        Some(match tc {
+            1 => FreeRunning32Incr,
+            2 => FreeRunning32Decr,
+            3 => OsIncr,
+            4 => OsDecr,
+            5 => CustomIncr,
+            6 => CustomDecr,
+            _ => return None,
+        })
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

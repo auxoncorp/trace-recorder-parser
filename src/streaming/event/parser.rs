@@ -3,7 +3,7 @@ use crate::streaming::{Error, ObjectDataTable, SymbolTable};
 use crate::time::{Frequency, Timestamp};
 use crate::types::{
     format_symbol_string, Endianness, FormattedString, IsrName, ObjectClass, ObjectHandle,
-    Priority, Protocol, SymbolString, TaskName, TrimmedString, UserEventChannel,
+    Priority, Protocol, SymbolString, TaskName, TimerCounter, TrimmedString, UserEventChannel,
 };
 use byteordered::ByteOrdered;
 use std::io::{self, Read};
@@ -102,7 +102,8 @@ impl EventParser {
                     timestamp,
                     frequency,
                     tick_rate_hz,
-                    hwtc_type,
+                    hwtc_type: TimerCounter::from_hwtc_type(hwtc_type)
+                        .ok_or(Error::InvalidTimerCounter(hwtc_type))?,
                     isr_chaining_threshold,
                     htc_period,
                 };
