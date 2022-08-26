@@ -634,6 +634,38 @@ mod test {
             )
         );
 
+        let fmt = "my float %f";
+        let out = "my float -1.1";
+        let arg_bytes: Vec<u8> = f32::to_le_bytes(-1.1).into_iter().collect();
+        assert_eq!(
+            format_symbol_string(
+                &sn_st,
+                Protocol::Snapshot,
+                Endianness::Little,
+                fmt,
+                &arg_bytes
+            )
+            .unwrap(),
+            (
+                FormattedString(out.to_string()),
+                vec![Argument::F32(OrderedFloat::from(-1.1_f32))]
+            )
+        );
+        assert_eq!(
+            format_symbol_string(
+                &sr_st,
+                Protocol::Streaming,
+                Endianness::Little,
+                fmt,
+                &arg_bytes
+            )
+            .unwrap(),
+            (
+                FormattedString(out.to_string()),
+                vec![Argument::F32(OrderedFloat::from(-1.1_f32))]
+            )
+        );
+
         let fmt = "small int %bd = medium int %hd";
         let out = "small int -4 = medium int -25";
         let arg_bytes: Vec<u8> = i8::to_le_bytes(-4)

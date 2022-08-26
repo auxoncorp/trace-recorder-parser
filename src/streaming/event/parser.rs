@@ -15,6 +15,9 @@ pub struct EventParser {
     /// Endianness of the data
     endianness: byteordered::Endianness,
 
+    /// Initial heap counter from the header struct
+    heap_counter: u32,
+
     /// Local scratch buffer for reading strings
     buf: Vec<u8>,
 
@@ -23,9 +26,10 @@ pub struct EventParser {
 }
 
 impl EventParser {
-    pub fn new(endianness: Endianness) -> Self {
+    pub fn new(endianness: Endianness, heap_counter: u32) -> Self {
         Self {
             endianness: byteordered::Endianness::from(endianness),
+            heap_counter,
             buf: Vec::with_capacity(256),
             arg_buf: Vec::with_capacity(256),
         }
@@ -332,6 +336,38 @@ impl EventParser {
                     priority,
                 };
                 Some((event_code, Event::TaskActivate(event)))
+            }
+
+            EventType::MemoryAlloc | EventType::MemoryFree => {
+                if num_params.0 != 2 {
+                    return Err(Error::InvalidEventParameterCount(
+                        event_code.event_id(),
+                        2,
+                        num_params,
+                    ));
+                }
+                let address = r.read_u32()?;
+                let size = r.read_u32()?;
+                if matches!(event_type, EventType::MemoryAlloc) {
+                    self.heap_counter = self.heap_counter.saturating_add(size);
+                } else {
+                    self.heap_counter = self.heap_counter.saturating_sub(size);
+                }
+                let event = MemoryEvent {
+                    event_count,
+                    timestamp,
+                    address,
+                    size,
+                    heap_counter: self.heap_counter,
+                };
+                Some((
+                    event_code,
+                    if matches!(event_type, EventType::MemoryAlloc) {
+                        Event::MemoryAlloc(event)
+                    } else {
+                        Event::MemoryFree(event)
+                    },
+                ))
             }
 
             EventType::UserEvent(arg_count) => {

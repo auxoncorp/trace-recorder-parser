@@ -4,6 +4,7 @@ use derive_more::{Binary, Deref, Display, Into, LowerHex, Octal, UpperHex};
 
 pub use base::BaseEvent;
 pub use isr::{IsrBeginEvent, IsrDefineEvent, IsrEvent, IsrResumeEvent};
+pub use memory::{MemoryAllocEvent, MemoryEvent, MemoryFreeEvent};
 pub use object_name::ObjectNameEvent;
 pub use parser::EventParser;
 pub use task::{
@@ -16,6 +17,7 @@ pub use user::UserEvent;
 
 pub mod base;
 pub mod isr;
+pub mod memory;
 pub mod object_name;
 pub mod parser;
 pub mod task;
@@ -162,6 +164,11 @@ pub enum EventType {
     #[display(fmt = "TASK_ACTIVATE")]
     TaskActivate,
 
+    #[display(fmt = "MEMORY_ALLOC")]
+    MemoryAlloc,
+    #[display(fmt = "MEMORY_FREE")]
+    MemoryFree,
+
     // User events
     // Note that user event code range is 0x90..=0x9F
     // Allow for 0-15 arguments (the arg count == word count, always 32 bits) is added to event code
@@ -195,6 +202,9 @@ impl From<EventId> for EventType {
             0x36 => TaskSwitchTaskResume,
             0x37 => TaskActivate,
 
+            0x38 => MemoryAlloc,
+            0x39 => MemoryFree,
+
             raw @ 0x90..=0x9F => UserEvent(UserEventArgRecordCount(raw as u8 - 0x90)),
 
             _ => Unknown(id),
@@ -222,6 +232,9 @@ impl From<EventType> for EventId {
             TaskSwitchTaskBegin => 0x35,
             TaskSwitchTaskResume => 0x36,
             TaskActivate => 0x37,
+
+            MemoryAlloc => 0x38,
+            MemoryFree => 0x39,
 
             UserEvent(ac) => (0x90 + ac.0).into(),
 
@@ -260,6 +273,11 @@ pub enum Event {
     #[display(fmt = "TaskActivate({_0})")]
     TaskActivate(TaskActivateEvent),
 
+    #[display(fmt = "MemoryAlloc({_0})")]
+    MemoryAlloc(MemoryAllocEvent),
+    #[display(fmt = "MemoryFree({_0})")]
+    MemoryFree(MemoryFreeEvent),
+
     #[display(fmt = "User({_0})")]
     User(UserEvent),
 
@@ -283,6 +301,8 @@ impl Event {
             TaskBegin(e) => e.event_count,
             TaskResume(e) => e.event_count,
             TaskActivate(e) => e.event_count,
+            MemoryAlloc(e) => e.event_count,
+            MemoryFree(e) => e.event_count,
             User(e) => e.event_count,
             Unknown(e) => e.event_count,
         }
@@ -303,6 +323,8 @@ impl Event {
             TaskBegin(e) => e.timestamp,
             TaskResume(e) => e.timestamp,
             TaskActivate(e) => e.timestamp,
+            MemoryAlloc(e) => e.timestamp,
+            MemoryFree(e) => e.timestamp,
             User(e) => e.timestamp,
             Unknown(e) => e.timestamp,
         }

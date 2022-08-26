@@ -52,7 +52,7 @@ impl RecorderData {
         debug!("Reading extension info");
         let extension_info = ExtensionInfo::read(r, header.endianness)?;
 
-        let mut parser = EventParser::new(header.endianness);
+        let mut parser = EventParser::new(header.endianness, header.heap_counter);
 
         debug!("Reading start event");
         let (event_code, event) = parser
