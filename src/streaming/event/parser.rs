@@ -57,6 +57,9 @@ impl EventParser {
 
         Ok(match event_type {
             EventType::TraceStart => {
+                // TODO - add a method on EventType for param_count
+                // enum with int and variable variants
+                // or just a min_param_count
                 if num_params.0 != 3 {
                     return Err(Error::InvalidEventParameterCount(
                         event_code.event_id(),
@@ -366,6 +369,95 @@ impl EventParser {
                         Event::MemoryAlloc(event)
                     } else {
                         Event::MemoryFree(event)
+                    },
+                ))
+            }
+
+            EventType::QueueCreate => {
+                if num_params.0 != 2 {
+                    return Err(Error::InvalidEventParameterCount(
+                        event_code.event_id(),
+                        2,
+                        num_params,
+                    ));
+                }
+                let handle = object_handle(&mut r, event_id)?;
+                let queue_length = r.read_u32()?;
+                object_data_table.update_class(handle, ObjectClass::Queue);
+                let event = QueueCreateEvent {
+                    event_count,
+                    timestamp,
+                    handle,
+                    queue_length,
+                };
+                Some((event_code, Event::QueueCreate(event)))
+            }
+
+            EventType::QueueSend
+            | EventType::QueueSendBlock
+            | EventType::QueueSendFromIsr
+            | EventType::QueueReceiveFromIsr
+            | EventType::QueueSendFront
+            | EventType::QueueSendFrontBlock
+            | EventType::QueueSendFrontFromIsr => {
+                if num_params.0 != 2 {
+                    return Err(Error::InvalidEventParameterCount(
+                        event_code.event_id(),
+                        2,
+                        num_params,
+                    ));
+                }
+                let handle: ObjectHandle = object_handle(&mut r, event_id)?;
+                let messages_waiting = r.read_u32()?;
+                let event = QueueEvent {
+                    event_count,
+                    timestamp,
+                    handle,
+                    ticks_to_wait: None,
+                    messages_waiting,
+                };
+                Some((
+                    event_code,
+                    match event_type {
+                        EventType::QueueSend => Event::QueueSend(event),
+                        EventType::QueueSendBlock => Event::QueueSendBlock(event),
+                        EventType::QueueSendFromIsr => Event::QueueSendFromIsr(event),
+                        EventType::QueueReceiveFromIsr => Event::QueueReceiveFromIsr(event),
+                        EventType::QueueSendFront => Event::QueueSendFront(event),
+                        EventType::QueueSendFrontBlock => Event::QueueSendFrontBlock(event),
+                        _ /*EventType::QueueSendFrontFromIsr*/ => Event::QueueSendFrontFromIsr(event),
+                    },
+                ))
+            }
+
+            EventType::QueueReceive
+            | EventType::QueueReceiveBlock
+            | EventType::QueuePeek
+            | EventType::QueuePeekBlock => {
+                if num_params.0 != 3 {
+                    return Err(Error::InvalidEventParameterCount(
+                        event_code.event_id(),
+                        3,
+                        num_params,
+                    ));
+                }
+                let handle: ObjectHandle = object_handle(&mut r, event_id)?;
+                let ticks_to_wait = Some(r.read_u32()?);
+                let messages_waiting = r.read_u32()?;
+                let event = QueueEvent {
+                    event_count,
+                    timestamp,
+                    handle,
+                    ticks_to_wait,
+                    messages_waiting,
+                };
+                Some((
+                    event_code,
+                    match event_type {
+                        EventType::QueueReceive => Event::QueueReceive(event),
+                        EventType::QueueReceiveBlock => Event::QueueReceiveBlock(event),
+                        EventType::QueuePeek => Event::QueuePeek(event),
+                        _ /*EventType::QueuePeekBlock*/ => Event::QueuePeekBlock(event),
                     },
                 ))
             }

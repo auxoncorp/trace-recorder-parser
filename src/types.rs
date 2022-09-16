@@ -176,6 +176,12 @@ impl ObjectHandle {
     }
 }
 
+impl From<ObjectHandle> for u32 {
+    fn from(h: ObjectHandle) -> u32 {
+        h.0.get()
+    }
+}
+
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
 pub enum ObjectClass {
     #[display(fmt = "Queue")]
