@@ -141,7 +141,9 @@ impl EventParser {
                 Some((event_code, Event::ObjectName(event)))
             }
 
-            EventType::TaskPriority => {
+            EventType::TaskPriority
+            | EventType::TaskPriorityInherit
+            | EventType::TaskPriorityDisinherit => {
                 if num_params.0 != 2 {
                     return Err(Error::InvalidEventParameterCount(
                         event_code.event_id(),
@@ -162,7 +164,14 @@ impl EventParser {
                     name: TaskName(sym.symbol.0.clone()),
                     priority,
                 };
-                Some((event_code, Event::TaskPriority(event)))
+                Some((
+                    event_code,
+                    match event_type {
+                    EventType::TaskPriority => Event::TaskPriority(event),
+                    EventType::TaskPriorityInherit => Event::TaskPriorityInherit(event),
+                    _ /*EventType::TaskPriorityDisinherit*/ => Event::TaskPriorityDisinherit(event),
+                },
+                ))
             }
 
             EventType::DefineIsr => {

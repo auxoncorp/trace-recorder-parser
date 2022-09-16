@@ -19,8 +19,8 @@ pub use semaphore::{
     SemaphoreTakeBlockEvent, SemaphoreTakeEvent, SemaphoreTakeFromIsrEvent,
 };
 pub use task::{
-    TaskActivateEvent, TaskBeginEvent, TaskCreateEvent, TaskEvent, TaskPriorityEvent,
-    TaskReadyEvent, TaskResumeEvent,
+    TaskActivateEvent, TaskBeginEvent, TaskCreateEvent, TaskEvent, TaskPriorityDisinheritEvent,
+    TaskPriorityEvent, TaskPriorityInheritEvent, TaskReadyEvent, TaskResumeEvent,
 };
 pub use trace_start::TraceStartEvent;
 pub use ts_config::TsConfigEvent;
@@ -160,6 +160,10 @@ pub enum EventType {
     ObjectName,
     #[display(fmt = "TASK_PRIORITY")]
     TaskPriority,
+    #[display(fmt = "TASK_PRIORITY_INHERIT")]
+    TaskPriorityInherit,
+    #[display(fmt = "TASK_PRIORITY_DISINHERIT")]
+    TaskPriorityDisinherit,
     #[display(fmt = "DEFINE_ISR")]
     DefineIsr,
 
@@ -255,6 +259,8 @@ impl From<EventId> for EventType {
             0x02 => TsConfig,
             0x03 => ObjectName,
             0x04 => TaskPriority,
+            0x05 => TaskPriorityInherit,
+            0x06 => TaskPriorityDisinherit,
             0x07 => DefineIsr,
 
             0x10 => TaskCreate,
@@ -312,6 +318,8 @@ impl From<EventType> for EventId {
             TsConfig => 0x02,
             ObjectName => 0x03,
             TaskPriority => 0x04,
+            TaskPriorityInherit => 0x05,
+            TaskPriorityDisinherit => 0x06,
             DefineIsr => 0x07,
 
             TaskCreate => 0x10,
@@ -370,6 +378,10 @@ pub enum Event {
     ObjectName(ObjectNameEvent),
     #[display(fmt = "TaskPriority({_0})")]
     TaskPriority(TaskPriorityEvent),
+    #[display(fmt = "TaskPriorityInherit({_0})")]
+    TaskPriorityInherit(TaskPriorityInheritEvent),
+    #[display(fmt = "TaskPriorityDisinherit({_0})")]
+    TaskPriorityDisinherit(TaskPriorityDisinheritEvent),
     #[display(fmt = "IsrDefine({_0})")]
     IsrDefine(IsrDefineEvent),
 
@@ -458,6 +470,8 @@ impl Event {
             TsConfig(e) => e.event_count,
             ObjectName(e) => e.event_count,
             TaskPriority(e) => e.event_count,
+            TaskPriorityInherit(e) => e.event_count,
+            TaskPriorityDisinherit(e) => e.event_count,
             IsrDefine(e) => e.event_count,
             TaskCreate(e) => e.event_count,
             QueueCreate(e) => e.event_count,
@@ -503,6 +517,8 @@ impl Event {
             TsConfig(e) => e.timestamp,
             ObjectName(e) => e.timestamp,
             TaskPriority(e) => e.timestamp,
+            TaskPriorityInherit(e) => e.timestamp,
+            TaskPriorityDisinherit(e) => e.timestamp,
             IsrDefine(e) => e.timestamp,
             TaskCreate(e) => e.timestamp,
             QueueCreate(e) => e.timestamp,

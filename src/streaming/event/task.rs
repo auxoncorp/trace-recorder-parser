@@ -17,6 +17,8 @@ pub struct TaskEvent {
 pub type TaskCreateEvent = TaskEvent;
 pub type TaskReadyEvent = TaskEvent;
 pub type TaskPriorityEvent = TaskEvent;
+pub type TaskPriorityInheritEvent = TaskEvent;
+pub type TaskPriorityDisinheritEvent = TaskEvent;
 pub type TaskBeginEvent = TaskEvent;
 pub type TaskResumeEvent = TaskEvent;
 pub type TaskActivateEvent = TaskEvent;
