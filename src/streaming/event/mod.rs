@@ -154,7 +154,7 @@ pub enum EventType {
 
     #[display(fmt = "TRACE_START")]
     TraceStart,
-    #[display(fmt = "TS_CONFIG")]
+    #[display(fmt = "TIMESTAMP_CONFIG")]
     TsConfig,
     #[display(fmt = "OBJECT_NAME")]
     ObjectName,
@@ -178,13 +178,13 @@ pub enum EventType {
 
     #[display(fmt = "TASK_READY")]
     TaskReady,
-    #[display(fmt = "TS_ISR_BEGIN")]
+    #[display(fmt = "TASK_SWITCH_ISR_BEGIN")]
     TaskSwitchIsrBegin,
-    #[display(fmt = "TS_ISR_RESUME")]
+    #[display(fmt = "TASK_SWITCH_ISR_RESUME")]
     TaskSwitchIsrResume,
-    #[display(fmt = "TS_TASK_BEGIN")]
+    #[display(fmt = "TASK_SWITCH_TASK_BEGIN")]
     TaskSwitchTaskBegin,
-    #[display(fmt = "TS_TASK_RESUME")]
+    #[display(fmt = "TASK_SWITCH_TASK_RESUME")]
     TaskSwitchTaskResume,
     #[display(fmt = "TASK_ACTIVATE")]
     TaskActivate,
