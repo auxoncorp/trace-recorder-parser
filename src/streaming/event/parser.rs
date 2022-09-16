@@ -564,6 +564,29 @@ impl EventParser {
                 ))
             }
 
+            EventType::UnusedStack => {
+                if num_params.0 != 2 {
+                    return Err(Error::InvalidEventParameterCount(
+                        event_code.event_id(),
+                        2,
+                        num_params,
+                    ));
+                }
+                let handle = object_handle(&mut r, event_id)?;
+                let low_mark = r.read_u32()?;
+                let sym = symbol_table
+                    .get(handle)
+                    .ok_or(Error::ObjectSymbolLookup(handle))?;
+                let event = UnusedStackEvent {
+                    event_count,
+                    timestamp,
+                    handle,
+                    task: TaskName(sym.symbol.0.clone()),
+                    low_mark,
+                };
+                Some((event_code, Event::UnusedStack(event)))
+            }
+
             EventType::UserEvent(arg_count) => {
                 // Always expect at least a channel
                 if num_params.0 < 1 {

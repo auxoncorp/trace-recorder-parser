@@ -24,6 +24,7 @@ pub use task::{
 };
 pub use trace_start::TraceStartEvent;
 pub use ts_config::TsConfigEvent;
+pub use unused_stack::UnusedStackEvent;
 pub use user::UserEvent;
 
 pub mod base;
@@ -36,6 +37,7 @@ pub mod semaphore;
 pub mod task;
 pub mod trace_start;
 pub mod ts_config;
+pub mod unused_stack;
 pub mod user;
 
 #[derive(
@@ -235,6 +237,9 @@ pub enum EventType {
     #[display(fmt = "USER_EVENT")]
     UserEvent(UserEventArgRecordCount),
 
+    #[display(fmt = "UNUSED_STACK")]
+    UnusedStack,
+
     // Variant to handle unknown/unsupported event ID
     #[display(fmt = "UNKNOWN({_0})")]
     Unknown(EventId),
@@ -290,6 +295,8 @@ impl From<EventId> for EventType {
 
             raw @ 0x90..=0x9F => UserEvent(UserEventArgRecordCount(raw as u8 - 0x90)),
 
+            0xEA => UnusedStack,
+
             _ => Unknown(id),
         }
     }
@@ -344,6 +351,8 @@ impl From<EventType> for EventId {
             SemaphorePeekBlock => 0x77,
 
             UserEvent(ac) => (0x90 + ac.0).into(),
+
+            UnusedStack => 0xEA,
 
             Unknown(raw) => raw.0,
         };
@@ -434,6 +443,9 @@ pub enum Event {
     #[display(fmt = "User({_0})")]
     User(UserEvent),
 
+    #[display(fmt = "UnusedStack({_0})")]
+    UnusedStack(UnusedStackEvent),
+
     #[display(fmt = "BaseEvent({_0})")]
     Unknown(BaseEvent),
 }
@@ -479,6 +491,7 @@ impl Event {
             SemaphorePeek(e) => e.event_count,
             SemaphorePeekBlock(e) => e.event_count,
             User(e) => e.event_count,
+            UnusedStack(e) => e.event_count,
             Unknown(e) => e.event_count,
         }
     }
@@ -523,6 +536,7 @@ impl Event {
             SemaphorePeek(e) => e.timestamp,
             SemaphorePeekBlock(e) => e.timestamp,
             User(e) => e.timestamp,
+            UnusedStack(e) => e.timestamp,
             Unknown(e) => e.timestamp,
         }
     }
