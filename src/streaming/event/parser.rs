@@ -462,6 +462,108 @@ impl EventParser {
                 ))
             }
 
+            EventType::SemaphoreBinaryCreate => {
+                if num_params.0 != 1 {
+                    return Err(Error::InvalidEventParameterCount(
+                        event_code.event_id(),
+                        1,
+                        num_params,
+                    ));
+                }
+                let handle: ObjectHandle = object_handle(&mut r, event_id)?;
+                object_data_table.update_class(handle, ObjectClass::Semaphore);
+                let event = SemaphoreCreateEvent {
+                    event_count,
+                    timestamp,
+                    handle,
+                    count: None,
+                };
+                Some((event_code, Event::SemaphoreBinaryCreate(event)))
+            }
+
+            EventType::SemaphoreCountingCreate => {
+                if num_params.0 != 2 {
+                    return Err(Error::InvalidEventParameterCount(
+                        event_code.event_id(),
+                        2,
+                        num_params,
+                    ));
+                }
+                let handle = object_handle(&mut r, event_id)?;
+                let count = Some(r.read_u32()?);
+                object_data_table.update_class(handle, ObjectClass::Semaphore);
+                let event = SemaphoreCreateEvent {
+                    event_count,
+                    timestamp,
+                    handle,
+                    count,
+                };
+                Some((event_code, Event::SemaphoreCountingCreate(event)))
+            }
+
+            EventType::SemaphoreGive
+            | EventType::SemaphoreGiveBlock
+            | EventType::SemaphoreGiveFromIsr
+            | EventType::SemaphoreTakeFromIsr => {
+                if num_params.0 != 2 {
+                    return Err(Error::InvalidEventParameterCount(
+                        event_code.event_id(),
+                        2,
+                        num_params,
+                    ));
+                }
+                let handle: ObjectHandle = object_handle(&mut r, event_id)?;
+                let count = r.read_u32()?;
+                let event = SemaphoreEvent {
+                    event_count,
+                    timestamp,
+                    handle,
+                    ticks_to_wait: None,
+                    count,
+                };
+                Some((
+                    event_code,
+                    match event_type {
+                        EventType::SemaphoreGive => Event::SemaphoreGive(event),
+                        EventType::SemaphoreGiveBlock => Event::SemaphoreGiveBlock(event),
+                        EventType::SemaphoreGiveFromIsr => Event::SemaphoreGiveFromIsr(event),
+                        _ /*EventType::SemaphoreTakeFromIsr*/ => Event::SemaphoreTakeFromIsr(event),
+                    },
+                ))
+            }
+
+            EventType::SemaphoreTake
+            | EventType::SemaphoreTakeBlock
+            | EventType::SemaphorePeek
+            | EventType::SemaphorePeekBlock => {
+                if num_params.0 != 3 {
+                    return Err(Error::InvalidEventParameterCount(
+                        event_code.event_id(),
+                        3,
+                        num_params,
+                    ));
+                }
+                let handle: ObjectHandle = object_handle(&mut r, event_id)?;
+                let ticks_to_wait = Some(r.read_u32()?);
+                let count = r.read_u32()?;
+                let event = SemaphoreEvent {
+                    event_count,
+                    timestamp,
+                    handle,
+                    ticks_to_wait,
+                    count,
+                };
+                Some((
+                    event_code,
+                    match event_type {
+                        EventType::SemaphoreTake => Event::SemaphoreTake(event),
+                        EventType::SemaphoreTakeBlock => Event::SemaphoreTakeBlock(event),
+                        EventType::SemaphorePeek => Event::SemaphorePeek(event),
+                        _ /*EventType::SemaphorePeekBlock*/ => Event::SemaphorePeekBlock(event),
+                    },
+                ))
+            }
+
             EventType::UserEvent(arg_count) => {
                 // Always expect at least a channel
                 if num_params.0 < 1 {

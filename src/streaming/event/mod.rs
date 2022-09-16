@@ -13,6 +13,11 @@ pub use queue::{
     QueueSendFromIsrEvent, QueueSendFrontBlockEvent, QueueSendFrontEvent,
     QueueSendFrontFromIsrEvent,
 };
+pub use semaphore::{
+    SemaphoreCreateEvent, SemaphoreEvent, SemaphoreGiveBlockEvent, SemaphoreGiveEvent,
+    SemaphoreGiveFromIsrEvent, SemaphorePeekBlockEvent, SemaphorePeekEvent,
+    SemaphoreTakeBlockEvent, SemaphoreTakeEvent, SemaphoreTakeFromIsrEvent,
+};
 pub use task::{
     TaskActivateEvent, TaskBeginEvent, TaskCreateEvent, TaskEvent, TaskPriorityEvent,
     TaskReadyEvent, TaskResumeEvent,
@@ -27,6 +32,7 @@ pub mod memory;
 pub mod object_name;
 pub mod parser;
 pub mod queue;
+pub mod semaphore;
 pub mod task;
 pub mod trace_start;
 pub mod ts_config;
@@ -159,6 +165,10 @@ pub enum EventType {
     TaskCreate,
     #[display(fmt = "QUEUE_CREATE")]
     QueueCreate,
+    #[display(fmt = "SEMAPHORE_BINARY_CREATE")]
+    SemaphoreBinaryCreate,
+    #[display(fmt = "SEMAPHORE_COUNTING_CREATE")]
+    SemaphoreCountingCreate,
 
     #[display(fmt = "TASK_READY")]
     TaskReady,
@@ -201,6 +211,23 @@ pub enum EventType {
     #[display(fmt = "QUEUE_SEND_FRONT_FROM_ISR")]
     QueueSendFrontFromIsr,
 
+    #[display(fmt = "SEMAPHORE_GIVE")]
+    SemaphoreGive,
+    #[display(fmt = "SEMAPHORE_GIVE_BLOCK")]
+    SemaphoreGiveBlock,
+    #[display(fmt = "SEMAPHORE_GIVE_FROM_ISR")]
+    SemaphoreGiveFromIsr,
+    #[display(fmt = "SEMAPHORE_TAKE")]
+    SemaphoreTake,
+    #[display(fmt = "SEMAPHORE_TAKE_BLOCK")]
+    SemaphoreTakeBlock,
+    #[display(fmt = "SEMAPHORE_TAKE_FROM_ISR")]
+    SemaphoreTakeFromIsr,
+    #[display(fmt = "SEMAPHORE_PEEK")]
+    SemaphorePeek,
+    #[display(fmt = "SEMAPHORE_PEEK_BLOCK")]
+    SemaphorePeekBlock,
+
     // User events
     // Note that user event code range is 0x90..=0x9F
     // Allow for 0-15 arguments (the arg count == word count, always 32 bits) is added to event code
@@ -227,6 +254,8 @@ impl From<EventId> for EventType {
 
             0x10 => TaskCreate,
             0x11 => QueueCreate,
+            0x12 => SemaphoreBinaryCreate,
+            0x16 => SemaphoreCountingCreate,
 
             0x30 => TaskReady,
             0x33 => TaskSwitchIsrBegin,
@@ -250,6 +279,15 @@ impl From<EventId> for EventType {
             0xC2 => QueueSendFrontBlock,
             0xC3 => QueueSendFrontFromIsr,
 
+            0x51 => SemaphoreGive,
+            0x57 => SemaphoreGiveBlock,
+            0x5A => SemaphoreGiveFromIsr,
+            0x61 => SemaphoreTake,
+            0x67 => SemaphoreTakeBlock,
+            0x6A => SemaphoreTakeFromIsr,
+            0x71 => SemaphorePeek,
+            0x77 => SemaphorePeekBlock,
+
             raw @ 0x90..=0x9F => UserEvent(UserEventArgRecordCount(raw as u8 - 0x90)),
 
             _ => Unknown(id),
@@ -271,6 +309,8 @@ impl From<EventType> for EventId {
 
             TaskCreate => 0x10,
             QueueCreate => 0x11,
+            SemaphoreBinaryCreate => 0x12,
+            SemaphoreCountingCreate => 0x16,
 
             TaskReady => 0x30,
             TaskSwitchIsrBegin => 0x33,
@@ -293,6 +333,15 @@ impl From<EventType> for EventId {
             QueueSendFront => 0xC0,
             QueueSendFrontBlock => 0xC2,
             QueueSendFrontFromIsr => 0xC3,
+
+            SemaphoreGive => 0x51,
+            SemaphoreGiveBlock => 0x57,
+            SemaphoreGiveFromIsr => 0x5A,
+            SemaphoreTake => 0x61,
+            SemaphoreTakeBlock => 0x67,
+            SemaphoreTakeFromIsr => 0x6A,
+            SemaphorePeek => 0x71,
+            SemaphorePeekBlock => 0x77,
 
             UserEvent(ac) => (0x90 + ac.0).into(),
 
@@ -319,6 +368,10 @@ pub enum Event {
     TaskCreate(TaskCreateEvent),
     #[display(fmt = "QueueCreate({_0})")]
     QueueCreate(QueueCreateEvent),
+    #[display(fmt = "SemaphoreBinaryCreate({_0})")]
+    SemaphoreBinaryCreate(SemaphoreCreateEvent),
+    #[display(fmt = "SemaphoreCountingCreate({_0})")]
+    SemaphoreCountingCreate(SemaphoreCreateEvent),
 
     #[display(fmt = "TaskReady({_0})")]
     TaskReady(TaskReadyEvent),
@@ -361,6 +414,23 @@ pub enum Event {
     #[display(fmt = "QueueSendFrontFromIsr({_0})")]
     QueueSendFrontFromIsr(QueueSendFrontFromIsrEvent),
 
+    #[display(fmt = "SemaphoreGive({_0})")]
+    SemaphoreGive(SemaphoreGiveEvent),
+    #[display(fmt = "SemaphoreGiveBlock({_0})")]
+    SemaphoreGiveBlock(SemaphoreGiveBlockEvent),
+    #[display(fmt = "SemaphoreGiveFromIsr({_0})")]
+    SemaphoreGiveFromIsr(SemaphoreGiveFromIsrEvent),
+    #[display(fmt = "SemaphoreTake({_0})")]
+    SemaphoreTake(SemaphoreTakeEvent),
+    #[display(fmt = "SemaphoreTakeBlock({_0})")]
+    SemaphoreTakeBlock(SemaphoreTakeBlockEvent),
+    #[display(fmt = "SemaphoreTakeFromIsr({_0})")]
+    SemaphoreTakeFromIsr(SemaphoreTakeFromIsrEvent),
+    #[display(fmt = "SemaphorePeek({_0})")]
+    SemaphorePeek(SemaphorePeekEvent),
+    #[display(fmt = "SemaphorePeekBlock({_0})")]
+    SemaphorePeekBlock(SemaphorePeekBlockEvent),
+
     #[display(fmt = "User({_0})")]
     User(UserEvent),
 
@@ -379,6 +449,8 @@ impl Event {
             IsrDefine(e) => e.event_count,
             TaskCreate(e) => e.event_count,
             QueueCreate(e) => e.event_count,
+            SemaphoreBinaryCreate(e) => e.event_count,
+            SemaphoreCountingCreate(e) => e.event_count,
             TaskReady(e) => e.event_count,
             IsrBegin(e) => e.event_count,
             IsrResume(e) => e.event_count,
@@ -398,6 +470,14 @@ impl Event {
             QueueSendFront(e) => e.event_count,
             QueueSendFrontBlock(e) => e.event_count,
             QueueSendFrontFromIsr(e) => e.event_count,
+            SemaphoreGive(e) => e.event_count,
+            SemaphoreGiveBlock(e) => e.event_count,
+            SemaphoreGiveFromIsr(e) => e.event_count,
+            SemaphoreTake(e) => e.event_count,
+            SemaphoreTakeBlock(e) => e.event_count,
+            SemaphoreTakeFromIsr(e) => e.event_count,
+            SemaphorePeek(e) => e.event_count,
+            SemaphorePeekBlock(e) => e.event_count,
             User(e) => e.event_count,
             Unknown(e) => e.event_count,
         }
@@ -413,6 +493,8 @@ impl Event {
             IsrDefine(e) => e.timestamp,
             TaskCreate(e) => e.timestamp,
             QueueCreate(e) => e.timestamp,
+            SemaphoreBinaryCreate(e) => e.timestamp,
+            SemaphoreCountingCreate(e) => e.timestamp,
             TaskReady(e) => e.timestamp,
             IsrBegin(e) => e.timestamp,
             IsrResume(e) => e.timestamp,
@@ -432,6 +514,14 @@ impl Event {
             QueueSendFront(e) => e.timestamp,
             QueueSendFrontBlock(e) => e.timestamp,
             QueueSendFrontFromIsr(e) => e.timestamp,
+            SemaphoreGive(e) => e.timestamp,
+            SemaphoreGiveBlock(e) => e.timestamp,
+            SemaphoreGiveFromIsr(e) => e.timestamp,
+            SemaphoreTake(e) => e.timestamp,
+            SemaphoreTakeBlock(e) => e.timestamp,
+            SemaphoreTakeFromIsr(e) => e.timestamp,
+            SemaphorePeek(e) => e.timestamp,
+            SemaphorePeekBlock(e) => e.timestamp,
             User(e) => e.timestamp,
             Unknown(e) => e.timestamp,
         }
