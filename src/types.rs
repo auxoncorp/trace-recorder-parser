@@ -6,6 +6,7 @@ use ordered_float::OrderedFloat;
 use std::fmt::Write as _;
 use std::io;
 use std::num::NonZeroU32;
+use std::str::FromStr;
 use thiserror::Error;
 use tracing::warn;
 
@@ -237,6 +238,30 @@ impl ObjectClass {
             StreamBuffer => 4,
             MessageBuffer => 4,
         }
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, thiserror::Error)]
+#[error("Invalid object class")]
+pub struct ParseObjectClassError;
+
+impl FromStr for ObjectClass {
+    type Err = ParseObjectClassError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use ObjectClass::*;
+        Ok(match s.to_lowercase().trim() {
+            "queue" => Queue,
+            "semaphore" => Semaphore,
+            "mutex" => Mutex,
+            "task" => Task,
+            "isr" => Isr,
+            "timer" => Timer,
+            "eventgroup" => EventGroup,
+            "streambuffer" => StreamBuffer,
+            "messagebuffer" => MessageBuffer,
+            _ => return Err(ParseObjectClassError),
+        })
     }
 }
 

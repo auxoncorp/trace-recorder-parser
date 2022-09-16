@@ -1,5 +1,5 @@
 use crate::streaming::event::EventCount;
-use crate::time::Timestamp;
+use crate::time::{Ticks, Timestamp};
 use crate::types::ObjectHandle;
 use derive_more::Display;
 
@@ -20,7 +20,7 @@ pub struct QueueEvent {
     pub timestamp: Timestamp,
 
     pub handle: ObjectHandle,
-    pub ticks_to_wait: Option<u32>,
+    pub ticks_to_wait: Option<Ticks>,
     pub messages_waiting: u32,
 }
 

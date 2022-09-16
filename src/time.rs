@@ -38,6 +38,39 @@ impl Frequency {
     }
 }
 
+#[derive(
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    Debug,
+    Display,
+    Binary,
+    Octal,
+    LowerHex,
+    UpperHex,
+    Add,
+    Sum,
+    AddAssign,
+    MulAssign,
+    Into,
+)]
+#[display(fmt = "{_0}")]
+pub struct Ticks(pub(crate) u32);
+
+impl Ticks {
+    pub const fn zero() -> Self {
+        Self(0)
+    }
+
+    pub const fn get_raw(&self) -> u32 {
+        self.0
+    }
+}
+
 /// Timestamp (in ticks).
 /// Stores accumulated differential timestamps in snapshot mode and device timer instant
 /// in streaming mode.
@@ -62,21 +95,28 @@ impl Frequency {
     Sum,
     AddAssign,
     MulAssign,
+    Into,
 )]
 #[display(fmt = "{_0}")]
 pub struct Timestamp(pub(crate) u64);
 
 impl Timestamp {
-    pub fn zero() -> Self {
+    pub const fn zero() -> Self {
         Self(0)
     }
 
-    pub fn get_raw(&self) -> u64 {
+    pub const fn get_raw(&self) -> u64 {
         self.0
     }
 
-    pub fn ticks(&self) -> u64 {
+    pub const fn ticks(&self) -> u64 {
         self.get_raw()
+    }
+}
+
+impl From<Ticks> for Timestamp {
+    fn from(t: Ticks) -> Self {
+        Timestamp(t.0.into())
     }
 }
 
@@ -128,8 +168,8 @@ impl ops::AddAssign<DifferentialTimestamp> for Timestamp {
 pub struct DifferentialTimestamp(pub(crate) u32);
 
 impl DifferentialTimestamp {
-    pub fn ticks(&self) -> u32 {
-        self.0
+    pub fn ticks(&self) -> Ticks {
+        Ticks(self.0)
     }
 }
 
@@ -148,7 +188,7 @@ impl DifferentialTimestamp {
         DifferentialTimestamp(u32::from(xts_16) << 16)
     }
 
-    pub fn zero() -> Self {
+    pub const fn zero() -> Self {
         Self(0)
     }
 
@@ -225,7 +265,7 @@ pub struct StreamingInstant {
 }
 
 impl StreamingInstant {
-    pub fn zero() -> Self {
+    pub const fn zero() -> Self {
         Self { lower: 0, upper: 0 }
     }
 
@@ -260,11 +300,11 @@ mod test {
 
         let xts_16 = 0x00_03;
         let mut dts_for_next_event = DifferentialTimestamp::from_xts16(xts_16);
-        assert_eq!(dts_for_next_event.ticks(), 0x00_03_00_00);
+        assert_eq!(dts_for_next_event.ticks().0, 0x00_03_00_00);
 
         let dts = Dts16(0x5F_D5);
         dts_for_next_event += dts;
-        assert_eq!(dts_for_next_event.ticks(), 0x00_03_5F_D5);
+        assert_eq!(dts_for_next_event.ticks().0, 0x00_03_5F_D5);
 
         accumulated_time += dts_for_next_event;
         assert_eq!(accumulated_time.ticks(), 0x00_03_5F_D5 + 0x0F);
@@ -279,11 +319,11 @@ mod test {
         let xts_16 = 0x11_22;
         let xts_8 = 0xE1;
         let mut dts_for_next_event = DifferentialTimestamp::from_xts8(xts_8, xts_16);
-        assert_eq!(dts_for_next_event.ticks(), 0xE1_11_22_00);
+        assert_eq!(dts_for_next_event.ticks().0, 0xE1_11_22_00);
 
         let dts = Dts8(0x33);
         dts_for_next_event += dts;
-        assert_eq!(dts_for_next_event.ticks(), 0xE1_11_22_33);
+        assert_eq!(dts_for_next_event.ticks().0, 0xE1_11_22_33);
 
         accumulated_time += dts_for_next_event;
         assert_eq!(accumulated_time.ticks(), 0xE1_11_22_33 + 0x0F);

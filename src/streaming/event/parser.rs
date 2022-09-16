@@ -1,6 +1,6 @@
 use crate::streaming::event::*;
 use crate::streaming::{Error, ObjectDataTable, SymbolTable};
-use crate::time::{Frequency, Timestamp};
+use crate::time::{Frequency, Ticks, Timestamp};
 use crate::types::{
     format_symbol_string, Endianness, FormatString, FormattedString, IsrName, ObjectClass,
     ObjectHandle, Priority, Protocol, SymbolString, TaskName, TimerCounter, TrimmedString,
@@ -451,7 +451,7 @@ impl EventParser {
                     ));
                 }
                 let handle: ObjectHandle = object_handle(&mut r, event_id)?;
-                let ticks_to_wait = Some(r.read_u32()?);
+                let ticks_to_wait = Some(Ticks(r.read_u32()?));
                 let messages_waiting = r.read_u32()?;
                 let event = QueueEvent {
                     event_count,
@@ -553,7 +553,7 @@ impl EventParser {
                     ));
                 }
                 let handle: ObjectHandle = object_handle(&mut r, event_id)?;
-                let ticks_to_wait = Some(r.read_u32()?);
+                let ticks_to_wait = Some(Ticks(r.read_u32()?));
                 let count = r.read_u32()?;
                 let event = SemaphoreEvent {
                     event_count,
