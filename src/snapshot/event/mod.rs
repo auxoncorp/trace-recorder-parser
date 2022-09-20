@@ -1,5 +1,5 @@
 use crate::time::Timestamp;
-use crate::types::{ObjectClass, TaskName, UserEventArgRecordCount};
+use crate::types::{ObjectClass, UserEventArgRecordCount};
 use derive_more::{Binary, Deref, Display, Into, LowerHex, Octal, UpperHex};
 
 pub use isr::{IsrBeginEvent, IsrEvent, IsrResumeEvent};

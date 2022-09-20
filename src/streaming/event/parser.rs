@@ -1,9 +1,9 @@
 use crate::streaming::event::*;
-use crate::streaming::{Error, ObjectDataTable, SymbolTable};
+use crate::streaming::{EntryTable, Error};
 use crate::time::{Frequency, Ticks, Timestamp};
 use crate::types::{
-    format_symbol_string, Endianness, FormatString, FormattedString, IsrName, ObjectClass,
-    ObjectHandle, Priority, Protocol, SymbolString, TaskName, TimerCounter, TrimmedString,
+    format_symbol_string, Endianness, FormatString, FormattedString, Heap, ObjectClass,
+    ObjectHandle, ObjectName, Priority, Protocol, SymbolString, TimerCounter, TrimmedString,
     UserEventChannel,
 };
 use byteordered::ByteOrdered;
@@ -15,8 +15,8 @@ pub struct EventParser {
     /// Endianness of the data
     endianness: byteordered::Endianness,
 
-    /// Initial heap counter from the header struct
-    heap_counter: u32,
+    /// Initial heap from the entry table, maintained by the parser
+    heap: Heap,
 
     /// Local scratch buffer for reading strings
     buf: Vec<u8>,
@@ -26,20 +26,23 @@ pub struct EventParser {
 }
 
 impl EventParser {
-    pub fn new(endianness: Endianness, heap_counter: u32) -> Self {
+    pub fn new(endianness: Endianness, heap: Heap) -> Self {
         Self {
             endianness: byteordered::Endianness::from(endianness),
-            heap_counter,
+            heap,
             buf: Vec::with_capacity(256),
             arg_buf: Vec::with_capacity(256),
         }
     }
 
+    pub fn system_heap(&self) -> &Heap {
+        &self.heap
+    }
+
     pub fn next_event<R: Read>(
         &mut self,
         r: &mut R,
-        symbol_table: &mut SymbolTable,
-        object_data_table: &mut ObjectDataTable,
+        entry_table: &mut EntryTable,
     ) -> Result<Option<(EventCode, Event)>, Error> {
         let mut r = ByteOrdered::new(r, self.endianness);
 
@@ -55,30 +58,27 @@ impl EventParser {
         let timestamp = Timestamp(r.read_u32()?.into());
         let num_params = event_code.parameter_count();
 
+        if let Some(expected_parameter_count) = event_type.expected_parameter_count() {
+            if usize::from(num_params) != expected_parameter_count {
+                return Err(Error::InvalidEventParameterCount(
+                    event_code.event_id(),
+                    expected_parameter_count,
+                    num_params,
+                ));
+            }
+        }
+
         Ok(match event_type {
             EventType::TraceStart => {
-                // TODO - add a method on EventType for param_count
-                // enum with int and variable variants
-                // or just a min_param_count
-                if num_params.0 != 3 {
-                    return Err(Error::InvalidEventParameterCount(
-                        event_code.event_id(),
-                        3,
-                        num_params,
-                    ));
-                }
-                let os_ticks = r.read_u32()?;
                 let handle = object_handle(&mut r, event_id)?;
-                let session_counter = r.read_u32()?;
-                let sym = symbol_table
-                    .get(handle)
-                    .ok_or(Error::ObjectSymbolLookup(handle))?;
+                let sym = entry_table
+                    .symbol(handle)
+                    .ok_or(Error::ObjectLookup(handle))?;
                 let event = TraceStartEvent {
                     event_count,
                     timestamp,
-                    os_ticks,
-                    current_task: TaskName(sym.symbol.0.clone()),
-                    session_counter,
+                    current_task_handle: handle,
+                    current_task: sym.clone().into(),
                 };
                 Some((event_code, Event::TraceStart(event)))
             }
@@ -91,7 +91,7 @@ impl EventParser {
                     _ => {
                         return Err(Error::InvalidEventParameterCount(
                             event_code.event_id(),
-                            3, // base count
+                            4, // base count
                             num_params,
                         ));
                     }
@@ -131,7 +131,7 @@ impl EventParser {
                 let symbol: SymbolString = self
                     .read_string(&mut r, (usize::from(num_params) - 1) * 4)?
                     .into();
-                symbol_table.insert(handle, symbol.clone());
+                entry_table.entry(handle).set_symbol(symbol.clone());
                 let event = ObjectNameEvent {
                     event_count,
                     timestamp,
@@ -144,24 +144,16 @@ impl EventParser {
             EventType::TaskPriority
             | EventType::TaskPriorityInherit
             | EventType::TaskPriorityDisinherit => {
-                if num_params.0 != 2 {
-                    return Err(Error::InvalidEventParameterCount(
-                        event_code.event_id(),
-                        2,
-                        num_params,
-                    ));
-                }
                 let handle = object_handle(&mut r, event_id)?;
                 let priority = Priority(r.read_u32()?);
-                object_data_table.insert(handle, priority);
-                let sym = symbol_table
-                    .get(handle)
-                    .ok_or(Error::ObjectSymbolLookup(handle))?;
+                let entry = entry_table.entry(handle);
+                entry.states.set_priority(priority);
+                let sym = entry.symbol.as_ref().ok_or(Error::ObjectLookup(handle))?;
                 let event = TaskEvent {
                     event_count,
                     timestamp,
                     handle,
-                    name: TaskName(sym.symbol.0.clone()),
+                    name: sym.clone().into(),
                     priority,
                 };
                 Some((
@@ -185,124 +177,98 @@ impl EventParser {
                 }
                 let handle = object_handle(&mut r, event_id)?;
                 let priority = Priority(r.read_u32()?);
-                object_data_table.insert(handle, priority);
-                object_data_table.update_class(handle, ObjectClass::Isr);
                 let symbol: SymbolString = self
                     .read_string(&mut r, (usize::from(num_params) - 2) * 4)?
                     .into();
-                symbol_table.insert(handle, symbol.clone());
+                let entry = entry_table.entry(handle);
+                entry.states.set_priority(priority);
+                entry.set_symbol(symbol.clone());
+                entry.set_class(ObjectClass::Isr);
                 let event = IsrEvent {
                     event_count,
                     timestamp,
                     handle,
-                    name: IsrName(symbol.0),
+                    name: symbol.into(),
                     priority,
                 };
                 Some((event_code, Event::IsrDefine(event)))
             }
 
             EventType::TaskCreate => {
-                if num_params.0 != 2 {
-                    return Err(Error::InvalidEventParameterCount(
-                        event_code.event_id(),
-                        2,
-                        num_params,
-                    ));
-                }
                 let handle = object_handle(&mut r, event_id)?;
                 let priority = Priority(r.read_u32()?);
-                object_data_table.insert(handle, priority);
-                object_data_table.update_class(handle, ObjectClass::Task);
-                let sym = symbol_table
-                    .get(handle)
-                    .ok_or(Error::ObjectSymbolLookup(handle))?;
+                let entry = entry_table.entry(handle);
+                entry.states.set_priority(priority);
+                entry.set_class(ObjectClass::Task);
+                let sym = entry.symbol.as_ref().ok_or(Error::ObjectLookup(handle))?;
                 let event = TaskEvent {
                     event_count,
                     timestamp,
                     handle,
-                    name: TaskName(sym.symbol.0.clone()),
+                    name: sym.clone().into(),
                     priority,
                 };
                 Some((event_code, Event::TaskCreate(event)))
             }
 
             EventType::TaskReady => {
-                if num_params.0 != 1 {
-                    return Err(Error::InvalidEventParameterCount(
-                        event_code.event_id(),
-                        1,
-                        num_params,
-                    ));
-                }
                 let handle = object_handle(&mut r, event_id)?;
-                let obj = object_data_table
-                    .get(handle)
-                    .ok_or(Error::ObjectDataLookup(handle))?;
-                let sym = symbol_table
-                    .get(handle)
-                    .ok_or(Error::ObjectSymbolLookup(handle))?;
+                let entry = entry_table.entry(handle);
+                let sym = entry.symbol.as_ref().ok_or(Error::ObjectLookup(handle))?;
                 let event = TaskEvent {
                     event_count,
                     timestamp,
                     handle,
-                    name: TaskName(sym.symbol.0.clone()),
-                    priority: obj.priority,
+                    name: sym.clone().into(),
+                    priority: entry.states.priority(),
                 };
                 Some((event_code, Event::TaskReady(event)))
             }
 
             EventType::TaskSwitchIsrBegin => {
-                if num_params.0 != 1 {
-                    return Err(Error::InvalidEventParameterCount(
-                        event_code.event_id(),
-                        1,
-                        num_params,
-                    ));
-                }
                 let handle = object_handle(&mut r, event_id)?;
-                let obj = object_data_table
-                    .get(handle)
-                    .ok_or(Error::ObjectDataLookup(handle))?;
-                let sym = symbol_table
-                    .get(handle)
-                    .ok_or(Error::ObjectSymbolLookup(handle))?;
+                let entry = entry_table.entry(handle);
+                let sym = entry.symbol.as_ref().ok_or(Error::ObjectLookup(handle))?;
                 let event = IsrEvent {
                     event_count,
                     timestamp,
                     handle,
-                    name: IsrName(sym.symbol.0.clone()),
-                    priority: obj.priority,
+                    name: sym.clone().into(),
+                    priority: entry.states.priority(),
                 };
                 Some((event_code, Event::IsrBegin(event)))
             }
 
             EventType::TaskSwitchIsrResume => {
-                if num_params.0 != 1 {
-                    return Err(Error::InvalidEventParameterCount(
-                        event_code.event_id(),
-                        1,
-                        num_params,
-                    ));
-                }
                 let handle = object_handle(&mut r, event_id)?;
-                let obj = object_data_table
-                    .get(handle)
-                    .ok_or(Error::ObjectDataLookup(handle))?;
-                let sym = symbol_table
-                    .get(handle)
-                    .ok_or(Error::ObjectSymbolLookup(handle))?;
+                let entry = entry_table.entry(handle);
+                let sym = entry.symbol.as_ref().ok_or(Error::ObjectLookup(handle))?;
                 let event = IsrEvent {
                     event_count,
                     timestamp,
                     handle,
-                    name: IsrName(sym.symbol.0.clone()),
-                    priority: obj.priority,
+                    name: sym.clone().into(),
+                    priority: entry.states.priority(),
                 };
                 Some((event_code, Event::IsrResume(event)))
             }
 
             EventType::TaskSwitchTaskResume => {
-                if num_params.0 != 1 {
+                let handle = object_handle(&mut r, event_id)?;
+                let entry = entry_table.entry(handle);
+                let sym = entry.symbol.as_ref().ok_or(Error::ObjectLookup(handle))?;
+                let event = TaskEvent {
+                    event_count,
+                    timestamp,
+                    handle,
+                    name: sym.clone().into(),
+                    priority: entry.states.priority(),
+                };
+                Some((event_code, Event::TaskResume(event)))
+            }
+
+            EventType::TaskActivate => {
+                if (num_params.0 != 1) && (num_params.0 != 2) {
                     return Err(Error::InvalidEventParameterCount(
                         event_code.event_id(),
                         1,
@@ -310,67 +276,38 @@ impl EventParser {
                     ));
                 }
                 let handle = object_handle(&mut r, event_id)?;
-                let obj = object_data_table
-                    .get(handle)
-                    .ok_or(Error::ObjectDataLookup(handle))?;
-                let sym = symbol_table
-                    .get(handle)
-                    .ok_or(Error::ObjectSymbolLookup(handle))?;
-                let event = TaskEvent {
-                    event_count,
-                    timestamp,
-                    handle,
-                    name: TaskName(sym.symbol.0.clone()),
-                    priority: obj.priority,
-                };
-                Some((event_code, Event::TaskResume(event)))
-            }
+                let entry = entry_table.entry(handle);
 
-            EventType::TaskActivate => {
-                if num_params.0 != 2 {
-                    return Err(Error::InvalidEventParameterCount(
-                        event_code.event_id(),
-                        2,
-                        num_params,
-                    ));
+                if num_params.0 == 2 {
+                    let priority = Priority(r.read_u32()?);
+                    entry.states.set_priority(priority);
                 }
-                let handle = object_handle(&mut r, event_id)?;
-                let priority = Priority(r.read_u32()?);
-                object_data_table.insert(handle, priority);
-                let sym = symbol_table
-                    .get(handle)
-                    .ok_or(Error::ObjectSymbolLookup(handle))?;
+
+                let sym = entry.symbol.as_ref().ok_or(Error::ObjectLookup(handle))?;
                 let event = TaskEvent {
                     event_count,
                     timestamp,
                     handle,
-                    name: TaskName(sym.symbol.0.clone()),
-                    priority,
+                    name: sym.clone().into(),
+                    priority: entry.states.priority(),
                 };
                 Some((event_code, Event::TaskActivate(event)))
             }
 
             EventType::MemoryAlloc | EventType::MemoryFree => {
-                if num_params.0 != 2 {
-                    return Err(Error::InvalidEventParameterCount(
-                        event_code.event_id(),
-                        2,
-                        num_params,
-                    ));
-                }
                 let address = r.read_u32()?;
                 let size = r.read_u32()?;
                 if matches!(event_type, EventType::MemoryAlloc) {
-                    self.heap_counter = self.heap_counter.saturating_add(size);
+                    self.heap.handle_alloc(size);
                 } else {
-                    self.heap_counter = self.heap_counter.saturating_sub(size);
+                    self.heap.handle_free(size);
                 }
                 let event = MemoryEvent {
                     event_count,
                     timestamp,
                     address,
                     size,
-                    heap_counter: self.heap_counter,
+                    heap: self.heap,
                 };
                 Some((
                     event_code,
@@ -383,20 +320,15 @@ impl EventParser {
             }
 
             EventType::QueueCreate => {
-                if num_params.0 != 2 {
-                    return Err(Error::InvalidEventParameterCount(
-                        event_code.event_id(),
-                        2,
-                        num_params,
-                    ));
-                }
                 let handle = object_handle(&mut r, event_id)?;
                 let queue_length = r.read_u32()?;
-                object_data_table.update_class(handle, ObjectClass::Queue);
+                let entry = entry_table.entry(handle);
+                entry.set_class(ObjectClass::Queue);
                 let event = QueueCreateEvent {
                     event_count,
                     timestamp,
                     handle,
+                    name: entry.symbol.clone().map(ObjectName::from),
                     queue_length,
                 };
                 Some((event_code, Event::QueueCreate(event)))
@@ -409,19 +341,13 @@ impl EventParser {
             | EventType::QueueSendFront
             | EventType::QueueSendFrontBlock
             | EventType::QueueSendFrontFromIsr => {
-                if num_params.0 != 2 {
-                    return Err(Error::InvalidEventParameterCount(
-                        event_code.event_id(),
-                        2,
-                        num_params,
-                    ));
-                }
                 let handle: ObjectHandle = object_handle(&mut r, event_id)?;
                 let messages_waiting = r.read_u32()?;
                 let event = QueueEvent {
                     event_count,
                     timestamp,
                     handle,
+                    name: entry_table.symbol(handle).cloned().map(ObjectName::from),
                     ticks_to_wait: None,
                     messages_waiting,
                 };
@@ -443,13 +369,6 @@ impl EventParser {
             | EventType::QueueReceiveBlock
             | EventType::QueuePeek
             | EventType::QueuePeekBlock => {
-                if num_params.0 != 3 {
-                    return Err(Error::InvalidEventParameterCount(
-                        event_code.event_id(),
-                        3,
-                        num_params,
-                    ));
-                }
                 let handle: ObjectHandle = object_handle(&mut r, event_id)?;
                 let ticks_to_wait = Some(Ticks(r.read_u32()?));
                 let messages_waiting = r.read_u32()?;
@@ -457,6 +376,7 @@ impl EventParser {
                     event_count,
                     timestamp,
                     handle,
+                    name: entry_table.symbol(handle).cloned().map(ObjectName::from),
                     ticks_to_wait,
                     messages_waiting,
                 };
@@ -472,39 +392,29 @@ impl EventParser {
             }
 
             EventType::SemaphoreBinaryCreate => {
-                if num_params.0 != 1 {
-                    return Err(Error::InvalidEventParameterCount(
-                        event_code.event_id(),
-                        1,
-                        num_params,
-                    ));
-                }
                 let handle: ObjectHandle = object_handle(&mut r, event_id)?;
-                object_data_table.update_class(handle, ObjectClass::Semaphore);
+                let entry = entry_table.entry(handle);
+                entry.set_class(ObjectClass::Semaphore);
                 let event = SemaphoreCreateEvent {
                     event_count,
                     timestamp,
                     handle,
+                    name: entry.symbol.clone().map(ObjectName::from),
                     count: None,
                 };
                 Some((event_code, Event::SemaphoreBinaryCreate(event)))
             }
 
             EventType::SemaphoreCountingCreate => {
-                if num_params.0 != 2 {
-                    return Err(Error::InvalidEventParameterCount(
-                        event_code.event_id(),
-                        2,
-                        num_params,
-                    ));
-                }
                 let handle = object_handle(&mut r, event_id)?;
                 let count = Some(r.read_u32()?);
-                object_data_table.update_class(handle, ObjectClass::Semaphore);
+                let entry = entry_table.entry(handle);
+                entry.set_class(ObjectClass::Semaphore);
                 let event = SemaphoreCreateEvent {
                     event_count,
                     timestamp,
                     handle,
+                    name: entry.symbol.clone().map(ObjectName::from),
                     count,
                 };
                 Some((event_code, Event::SemaphoreCountingCreate(event)))
@@ -514,19 +424,13 @@ impl EventParser {
             | EventType::SemaphoreGiveBlock
             | EventType::SemaphoreGiveFromIsr
             | EventType::SemaphoreTakeFromIsr => {
-                if num_params.0 != 2 {
-                    return Err(Error::InvalidEventParameterCount(
-                        event_code.event_id(),
-                        2,
-                        num_params,
-                    ));
-                }
                 let handle: ObjectHandle = object_handle(&mut r, event_id)?;
                 let count = r.read_u32()?;
                 let event = SemaphoreEvent {
                     event_count,
                     timestamp,
                     handle,
+                    name: entry_table.symbol(handle).cloned().map(ObjectName::from),
                     ticks_to_wait: None,
                     count,
                 };
@@ -545,13 +449,6 @@ impl EventParser {
             | EventType::SemaphoreTakeBlock
             | EventType::SemaphorePeek
             | EventType::SemaphorePeekBlock => {
-                if num_params.0 != 3 {
-                    return Err(Error::InvalidEventParameterCount(
-                        event_code.event_id(),
-                        3,
-                        num_params,
-                    ));
-                }
                 let handle: ObjectHandle = object_handle(&mut r, event_id)?;
                 let ticks_to_wait = Some(Ticks(r.read_u32()?));
                 let count = r.read_u32()?;
@@ -559,6 +456,7 @@ impl EventParser {
                     event_count,
                     timestamp,
                     handle,
+                    name: entry_table.symbol(handle).cloned().map(ObjectName::from),
                     ticks_to_wait,
                     count,
                 };
@@ -574,23 +472,16 @@ impl EventParser {
             }
 
             EventType::UnusedStack => {
-                if num_params.0 != 2 {
-                    return Err(Error::InvalidEventParameterCount(
-                        event_code.event_id(),
-                        2,
-                        num_params,
-                    ));
-                }
                 let handle = object_handle(&mut r, event_id)?;
                 let low_mark = r.read_u32()?;
-                let sym = symbol_table
-                    .get(handle)
-                    .ok_or(Error::ObjectSymbolLookup(handle))?;
+                let sym = entry_table
+                    .symbol(handle)
+                    .ok_or(Error::ObjectLookup(handle))?;
                 let event = UnusedStackEvent {
                     event_count,
                     timestamp,
                     handle,
-                    task: TaskName(sym.symbol.0.clone()),
+                    task: sym.clone().into(),
                     low_mark,
                 };
                 Some((event_code, Event::UnusedStack(event)))
@@ -615,9 +506,9 @@ impl EventParser {
 
                 // Parse out <channel-handle> [args] <format-string>
                 let channel_handle = object_handle(&mut r, event_id)?;
-                let channel = symbol_table
-                    .get(channel_handle)
-                    .map(|se| UserEventChannel::Custom(se.symbol.clone().into()))
+                let channel = entry_table
+                    .symbol(channel_handle)
+                    .map(|sym| UserEventChannel::Custom(sym.clone().into()))
                     .unwrap_or(UserEventChannel::Default);
 
                 // arg_count includes the format string, we want the args, if any
@@ -637,7 +528,7 @@ impl EventParser {
                 let format_string = self.read_string(&mut r, num_fmt_str_bytes)?;
 
                 let (formatted_string, args) = match format_symbol_string(
-                    symbol_table,
+                    entry_table,
                     Protocol::Streaming,
                     self.endianness.into(),
                     &format_string,

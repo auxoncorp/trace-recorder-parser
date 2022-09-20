@@ -1,6 +1,6 @@
 use crate::streaming::event::EventCount;
 use crate::time::{Ticks, Timestamp};
-use crate::types::ObjectHandle;
+use crate::types::{ObjectHandle, SemaphoreName};
 use derive_more::Display;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
@@ -10,6 +10,7 @@ pub struct SemaphoreCreateEvent {
     pub timestamp: Timestamp,
 
     pub handle: ObjectHandle,
+    pub name: Option<SemaphoreName>,
     pub count: Option<u32>,
 }
 
@@ -20,6 +21,7 @@ pub struct SemaphoreEvent {
     pub timestamp: Timestamp,
 
     pub handle: ObjectHandle,
+    pub name: Option<SemaphoreName>,
     pub ticks_to_wait: Option<Ticks>,
     pub count: u32,
 }

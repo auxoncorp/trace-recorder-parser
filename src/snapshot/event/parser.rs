@@ -3,8 +3,8 @@ use crate::snapshot::object_properties::ObjectPropertyTable;
 use crate::snapshot::symbol_table::SymbolTable;
 use crate::time::{DifferentialTimestamp, Dts16, Dts8, Timestamp};
 use crate::types::{
-    format_symbol_string, FormatString, FormattedString, FormattedStringError, IsrName,
-    ObjectClass, ObjectHandle, Protocol, UserEventChannel,
+    format_symbol_string, FormatString, FormattedString, FormattedStringError, ObjectClass,
+    ObjectHandle, ObjectName, Protocol, UserEventChannel,
 };
 use byteordered::{ByteOrdered, Endianness};
 use derive_more::From;
@@ -106,7 +106,7 @@ impl EventParser {
                     .ok_or(Error::ObjectLookup(handle))?;
                 let event = IsrEvent {
                     handle,
-                    name: IsrName(obj.display_name().to_string()),
+                    name: ObjectName(obj.display_name().to_string()),
                     priority: obj.priority(),
                     timestamp: self.get_timestamp(dts.into()),
                 };
@@ -134,7 +134,7 @@ impl EventParser {
                     .ok_or(Error::ObjectLookup(handle))?;
                 let event = TaskEvent {
                     handle,
-                    name: TaskName(obj.display_name().to_string()),
+                    name: ObjectName(obj.display_name().to_string()),
                     state: obj.state(),
                     priority: obj.current_priority(),
                     timestamp: self.get_timestamp(dts.into()),
@@ -161,7 +161,7 @@ impl EventParser {
                             event_type,
                             Event::TaskCreate(TaskEvent {
                                 handle,
-                                name: TaskName(obj.display_name().to_string()),
+                                name: ObjectName(obj.display_name().to_string()),
                                 state: obj.state(),
                                 priority: obj.current_priority(),
                                 timestamp: self.accumulated_time,

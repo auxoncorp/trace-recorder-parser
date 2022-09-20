@@ -301,7 +301,7 @@ impl From<EventId> for EventType {
 
             raw @ 0x90..=0x9F => UserEvent(UserEventArgRecordCount(raw as u8 - 0x90)),
 
-            0xEA => UnusedStack,
+            0xEB => UnusedStack,
 
             _ => Unknown(id),
         }
@@ -360,11 +360,53 @@ impl From<EventType> for EventId {
 
             UserEvent(ac) => (0x90 + ac.0).into(),
 
-            UnusedStack => 0xEA,
+            UnusedStack => 0xEB,
 
             Unknown(raw) => raw.0,
         };
         EventId(id)
+    }
+}
+
+impl EventType {
+    /// Return the number of expected parameters for the event type, otherwise
+    /// return None for event types with variable parameters.
+    pub(crate) fn expected_parameter_count(&self) -> Option<usize> {
+        use EventType::*;
+        Some(match self {
+            Null => 0,
+            TraceStart => 1,
+
+            TaskPriority | TaskPriorityInherit | TaskPriorityDisinherit => 2,
+
+            TsConfig | ObjectName | DefineIsr | TaskActivate | UserEvent(_) | Unknown(_) => {
+                return None
+            }
+
+            TaskCreate | QueueCreate | SemaphoreCountingCreate => 2,
+            SemaphoreBinaryCreate => 1,
+
+            TaskReady | TaskSwitchIsrBegin | TaskSwitchIsrResume | TaskSwitchTaskBegin
+            | TaskSwitchTaskResume => 1,
+
+            MemoryAlloc | MemoryFree => 2,
+
+            QueueSend
+            | QueueSendBlock
+            | QueueSendFromIsr
+            | QueueReceiveFromIsr
+            | QueueSendFront
+            | QueueSendFrontBlock
+            | QueueSendFrontFromIsr => 2,
+
+            QueueReceive | QueueReceiveBlock | QueuePeek | QueuePeekBlock => 3,
+
+            SemaphoreGive | SemaphoreGiveBlock | SemaphoreGiveFromIsr | SemaphoreTakeFromIsr => 2,
+
+            SemaphoreTake | SemaphoreTakeBlock | SemaphorePeek | SemaphorePeekBlock => 3,
+
+            UnusedStack => 2,
+        })
     }
 }
 

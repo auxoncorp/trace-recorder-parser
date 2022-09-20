@@ -1,5 +1,5 @@
-use crate::streaming::event::{EventId, EventParameterCount, EventType};
-use crate::streaming::{ObjectDataTableEntry, SymbolTableEntry};
+use crate::streaming::entry_table::{Entry, EntryStates};
+use crate::streaming::event::{EventId, EventParameterCount};
 use crate::types::{FormattedStringError, ObjectHandle};
 use std::io;
 use thiserror::Error;
@@ -13,46 +13,25 @@ pub enum Error {
     PSFEndiannessIdentifier(u32),
 
     #[error(
-        "Symbol table slot size must be greater than {} (SYMBOL_TABLE_SLOT_SIZE)",
-        SymbolTableEntry::MIN_SIZE
+        "Entry table symbol size must be greater than {} (TRC_ENTRY_TABLE_SLOT_SYMBOL_SIZE)",
+        Entry::MIN_SYMBOL_SIZE
     )]
-    InvalidSymbolTableSlotSize,
+    InvalidEntryTableSymbolSize,
 
     #[error(
-        "Object data table slot size must be greater than {} (OBJECT_DATA_SLOT_SIZE)",
-        ObjectDataTableEntry::MIN_SIZE
+        "Entry table state count must be greater than or equal to {} (TRC_ENTRY_TABLE_STATE_COUNT)",
+        EntryStates::NUM_STATES
     )]
-    InvalidObjectDataTableSlotSize,
+    InvalidEntryTableStateCount,
 
     #[error("Event ID {0} expects {1} parameters but reported having {2}")]
     InvalidEventParameterCount(EventId, usize, EventParameterCount),
 
-    #[error("Missing {} event", EventType::TraceStart)]
-    MissingStartEvent,
-
-    #[error(
-        "Invalid start event ID {0}, expected {}",
-        EventId::from(EventType::TraceStart)
-    )]
-    InvalidStartEvent(EventId),
-
-    #[error("Missing {} event", EventType::TsConfig)]
-    MissingTsConfigEvent,
-
-    #[error(
-        "Invalid TS config event ID {0}, expected {}",
-        EventId::from(EventType::TsConfig)
-    )]
-    InvalidTsConfigEvent(EventId),
-
     #[error("TsConfig event contains an invalid timer counter type {0}")]
     InvalidTimerCounter(u32),
 
-    #[error("Found an event with object handle {0} that doesn't exist in the symbol table")]
-    ObjectSymbolLookup(ObjectHandle),
-
-    #[error("Found an event with object handle {0} that doesn't exist in the object data table")]
-    ObjectDataLookup(ObjectHandle),
+    #[error("Found an event with object handle {0} that doesn't exist in the entry table")]
+    ObjectLookup(ObjectHandle),
 
     #[error("Found an event ({0}) with an invalid zero value object handle")]
     InvalidObjectHandle(EventId),

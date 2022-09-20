@@ -1,5 +1,7 @@
 use crate::streaming::Error;
-use crate::types::{Endianness, KernelPortIdentity, KernelVersion};
+use crate::types::{
+    Endianness, KernelPortIdentity, KernelVersion, PlatformCfgVersion, TrimmedString,
+};
 use byteordered::ByteOrdered;
 use std::io::Read;
 use tracing::{debug, warn};
@@ -10,16 +12,12 @@ pub struct HeaderInfo {
     pub format_version: u16,
     pub kernel_version: KernelVersion,
     pub kernel_port: KernelPortIdentity,
+    pub options: u32,
     pub irq_priority_order: u32,
-    pub heap_counter: u32,
-    /// `SYMBOL_TABLE_SLOT_SIZE`, size in bytes of each symbol table entry
-    pub symbol_size: usize,
-    /// `TRC_CFG_SYMBOL_TABLE_SLOTS`, number of symbol table entries
-    pub symbol_count: usize,
-    /// `OBJECT_DATA_SLOT_SIZE`, size in bytes of each object
-    pub object_data_size: usize,
-    /// `TRC_CFG_OBJECT_DATA_SLOTS`, number of object data entries
-    pub object_data_count: usize,
+    pub num_cores: u32,
+    pub isr_tail_chaining_threshold: u32,
+    pub platform_cfg: String,
+    pub platform_cfg_version: PlatformCfgVersion,
 }
 
 impl HeaderInfo {
@@ -57,30 +55,40 @@ impl HeaderInfo {
         if kernel_port != KernelPortIdentity::FreeRtos {
             warn!("Kernel port {kernel_port} is not officially supported");
         }
-        if format_version != 6 {
+        if format_version != 10 {
             warn!("Version {format_version} is not officially supported");
         }
 
         // Everything after this is version specific
+        let options = r.read_u32()?;
+        let irq_priority_order = options & 0x01;
+        let num_cores = r.read_u32()?;
+        let isr_tail_chaining_threshold = r.read_u32()?;
 
-        let irq_priority_order = r.read_u32()? & 0x01;
-        let heap_counter = r.read_u32()?;
-        let symbol_size = r.read_u16()?.into();
-        let symbol_count = r.read_u16()?.into();
-        let object_data_size = r.read_u16()?.into();
-        let object_data_count = r.read_u16()?.into();
+        let mut platform_cfg: [u8; 8] = [0; 8];
+        r.read_exact(&mut platform_cfg)?;
+        let platform_cfg = TrimmedString::from_raw(&platform_cfg).into();
+
+        let patch = r.read_u16()?;
+        let minor = r.read_u8()?;
+        let major = r.read_u8()?;
+        let platform_cfg_version = PlatformCfgVersion {
+            major,
+            minor,
+            patch,
+        };
 
         Ok(Self {
             endianness,
             format_version,
             kernel_version,
             kernel_port,
+            options,
             irq_priority_order,
-            heap_counter,
-            symbol_size,
-            symbol_count,
-            object_data_size,
-            object_data_count,
+            num_cores,
+            isr_tail_chaining_threshold,
+            platform_cfg,
+            platform_cfg_version,
         })
     }
 }

@@ -113,6 +113,14 @@ impl KernelVersion {
     }
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Into, Display)]
+#[display(fmt = "{}.{}.{}", major, minor, patch)]
+pub struct PlatformCfgVersion {
+    pub major: u8,
+    pub minor: u8,
+    pub patch: u16,
+}
+
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
 pub enum FloatEncoding {
     // TRC_CFG_INCLUDE_FLOAT_SUPPORT == 0
@@ -271,7 +279,7 @@ pub(crate) trait SymbolTableExt {
     fn symbol(&self, handle: ObjectHandle) -> Option<&SymbolString>;
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Into, Deref, Display)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Into, Display)]
 #[display(fmt = "{_0}")]
 pub struct SymbolString(pub(crate) String);
 
@@ -281,7 +289,21 @@ impl From<TrimmedString> for SymbolString {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Into, Deref, Display)]
+impl AsRef<str> for SymbolString {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::ops::Deref for SymbolString {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Into, Display)]
 #[display(fmt = "{_0}")]
 pub(crate) struct TrimmedString(pub(crate) String);
 
@@ -297,23 +319,51 @@ impl TrimmedString {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Into, Display)]
-#[display(fmt = "{_0}")]
-pub struct Priority(pub(crate) u32);
+impl std::ops::Deref for TrimmedString {
+    type Target = str;
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Into, Deref, Display)]
-#[display(fmt = "{_0}")]
-pub struct TaskName(pub(crate) String);
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 pub const STARTUP_TASK_NAME: &str = "(startup)";
 pub const TZ_CTRL_TASK_NAME: &str = "TzCtrl";
 
-pub type TaskPriority = Priority;
-
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Into, Deref, Display)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Into, Display)]
 #[display(fmt = "{_0}")]
-pub struct IsrName(pub(crate) String);
+pub struct ObjectName(pub(crate) String);
 
+pub type TaskName = ObjectName;
+pub type IsrName = ObjectName;
+pub type QueueName = ObjectName;
+pub type SemaphoreName = ObjectName;
+
+impl From<SymbolString> for ObjectName {
+    fn from(s: SymbolString) -> Self {
+        Self(s.0)
+    }
+}
+
+impl AsRef<str> for ObjectName {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::ops::Deref for ObjectName {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Into, Display)]
+#[display(fmt = "{_0}")]
+pub struct Priority(pub(crate) u32);
+
+pub type TaskPriority = Priority;
 pub type IsrPriority = Priority;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
@@ -547,6 +597,26 @@ impl TimerCounter {
     }
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+pub struct Heap {
+    pub current: u32,
+    pub high_water_mark: u32,
+    pub max: u32,
+}
+
+impl Heap {
+    pub(crate) fn handle_alloc(&mut self, size: u32) {
+        self.current = self.current.saturating_add(size);
+        if self.current > self.high_water_mark {
+            self.high_water_mark = self.current;
+        }
+    }
+
+    pub(crate) fn handle_free(&mut self, size: u32) {
+        self.current = self.current.saturating_sub(size);
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -604,8 +674,8 @@ mod test {
 
     #[test]
     fn string_formatting() {
-        let mut sn_st = crate::snapshot::symbol_table::SymbolTable::default();
-        let mut sr_st = crate::streaming::symbol_table::SymbolTable::default();
+        let mut sn_st = crate::snapshot::SymbolTable::default();
+        let mut sr_st = crate::streaming::EntryTable::default();
 
         let fmt = "literal";
         assert_eq!(
@@ -747,7 +817,7 @@ mod test {
             crate::snapshot::symbol_table::SymbolCrc6::new(str_arg),
             symbol.clone(),
         );
-        sr_st.insert(handle, symbol.clone());
+        sr_st.entry(handle).set_symbol(symbol.clone());
         let arg_bytes = u32::to_le_bytes(handle.0.get());
         assert_eq!(
             format_symbol_string(

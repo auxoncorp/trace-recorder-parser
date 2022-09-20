@@ -4,8 +4,8 @@ A Rust library to parse Percepio's [TraceRecorder](https://github.com/percepio/T
 
 Supports the following kernel ports:
 * FreeRTOS
-  - snapshot protocol version 6
-  - streaming protocol version 6
+  - snapshot protocol, format version 6
+  - streaming protocol format version 10
 
 ## LICENSE
 
