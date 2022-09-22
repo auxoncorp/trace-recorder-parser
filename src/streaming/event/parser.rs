@@ -393,6 +393,7 @@ impl EventParser {
 
             EventType::SemaphoreBinaryCreate => {
                 let handle: ObjectHandle = object_handle(&mut r, event_id)?;
+                let _unused = r.read_u32()?;
                 let entry = entry_table.entry(handle);
                 entry.set_class(ObjectClass::Semaphore);
                 let event = SemaphoreCreateEvent {

@@ -1,2 +1,5 @@
 /target
 /Cargo.lock
+/test_resources/src/streaming/v10/build
+/test_resources/src/streaming/v10/FreeRTOS
+/test_resources/src/streaming/v10/TraceRecorderSource

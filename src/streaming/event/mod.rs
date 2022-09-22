@@ -1,6 +1,6 @@
 use crate::time::Timestamp;
 use crate::types::UserEventArgRecordCount;
-use derive_more::{Binary, Deref, Display, Into, LowerHex, Octal, UpperHex};
+use derive_more::{Binary, Deref, Display, From, Into, LowerHex, Octal, UpperHex};
 
 pub use base::BaseEvent;
 pub use isr::{IsrBeginEvent, IsrDefineEvent, IsrEvent, IsrResumeEvent};
@@ -136,6 +136,7 @@ impl EventCode {
     PartialOrd,
     Hash,
     Debug,
+    From,
     Into,
     Display,
     Binary,
@@ -144,7 +145,7 @@ impl EventCode {
     UpperHex,
 )]
 #[display(fmt = "{_0:X}")]
-pub struct EventId(u16);
+pub struct EventId(pub u16);
 
 /// Event types for streaming mode
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
@@ -383,8 +384,7 @@ impl EventType {
                 return None
             }
 
-            TaskCreate | QueueCreate | SemaphoreCountingCreate => 2,
-            SemaphoreBinaryCreate => 1,
+            TaskCreate | QueueCreate | SemaphoreCountingCreate | SemaphoreBinaryCreate => 2,
 
             TaskReady | TaskSwitchIsrBegin | TaskSwitchIsrResume | TaskSwitchTaskBegin
             | TaskSwitchTaskResume => 1,

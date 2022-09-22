@@ -1,7 +1,7 @@
 //! Types common to both the snapshot and streaming protocol
 
 use byteordered::ByteOrdered;
-use derive_more::{Binary, Deref, Display, Into, LowerHex, Octal, UpperHex};
+use derive_more::{Binary, Deref, Display, From, Into, LowerHex, Octal, UpperHex};
 use ordered_float::OrderedFloat;
 use std::fmt::Write as _;
 use std::io;
@@ -394,6 +394,7 @@ impl UserEventChannel {
     PartialOrd,
     Hash,
     Debug,
+    From,
     Into,
     Display,
     Binary,
@@ -403,7 +404,7 @@ impl UserEventChannel {
     Deref,
 )]
 #[display(fmt = "{_0}")]
-pub struct UserEventArgRecordCount(pub(crate) u8);
+pub struct UserEventArgRecordCount(pub u8);
 
 impl UserEventArgRecordCount {
     pub const MAX: usize = 15;
