@@ -22,7 +22,7 @@ fn main() {
     match do_main() {
         Ok(()) => (),
         Err(e) => {
-            eprintln!("{}", e);
+            eprintln!("{e}");
             let mut cause = e.source();
             while let Some(err) = cause {
                 eprintln!("Caused by: {err}");
@@ -42,7 +42,7 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut f = File::open(&opts.path)?;
     let desc = RecorderData::locate_and_parse(&mut f)?;
-    println!("{:#?}", desc);
+    println!("{desc:#?}");
 
     if !opts.no_events {
         let mut observed_type_counters = BTreeMap::new();

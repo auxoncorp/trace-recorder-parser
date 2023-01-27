@@ -43,7 +43,7 @@ impl SymbolTableExt for SymbolTable {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
-#[display(fmt = "{}", symbol)]
+#[display(fmt = "{symbol}")]
 pub struct SymbolTableEntry {
     /// Reference to a symbol table entry, a label for vTracePrintF
     /// format strings only (the handle of the destination channel)

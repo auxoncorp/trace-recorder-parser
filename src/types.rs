@@ -114,7 +114,7 @@ impl KernelVersion {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Into, Display)]
-#[display(fmt = "{}.{}.{}", major, minor, patch)]
+#[display(fmt = "{major}.{minor}.{patch}")]
 pub struct PlatformCfgVersion {
     pub major: u8,
     pub minor: u8,
