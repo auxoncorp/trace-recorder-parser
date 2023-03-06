@@ -164,7 +164,7 @@ impl FloatEncoding {
     LowerHex,
     UpperHex,
 )]
-#[display(fmt = "{_0:X}")]
+#[display(fmt = "{_0}")]
 pub struct ObjectHandle(pub(crate) NonZeroU32);
 
 impl ObjectHandle {

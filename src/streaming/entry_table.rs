@@ -40,6 +40,25 @@ impl EntryTable {
         self.0.get(&handle).and_then(|e| e.class)
     }
 
+    pub fn symbol_handle<S: AsRef<str>>(
+        &self,
+        symbol: S,
+        class: Option<ObjectClass>,
+    ) -> Option<ObjectHandle> {
+        self.0.iter().find_map(|(handle, entry)| {
+            let sym_match = entry.symbol.as_deref() == Some(symbol.as_ref());
+            let class_match = match class {
+                None => true,
+                Some(c) => entry.class == Some(c),
+            };
+            if sym_match && class_match {
+                Some(*handle)
+            } else {
+                None
+            }
+        })
+    }
+
     pub(crate) fn system_heap(&self) -> Option<Heap> {
         self.0
             .values()
