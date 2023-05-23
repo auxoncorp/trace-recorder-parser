@@ -479,7 +479,7 @@ impl RecorderData {
             // Buffer is still still contiguous, can iterate from start of memory
             let num_events_clamped = std::cmp::min(self.num_events, self.max_events);
             r.seek(SeekFrom::Start(self.event_data_offset))?;
-            Ok(Box::new((0..num_events_clamped).into_iter().map(|_| {
+            Ok(Box::new((0..num_events_clamped).map(|_| {
                 let mut record = [0; EventRecord::SIZE];
                 r.read_exact(&mut record)?;
                 Ok(EventRecord::new(record))
@@ -496,7 +496,7 @@ impl RecorderData {
                 self.event_data_offset + u64::from(tail_offset),
             ))?;
 
-            let iter = (0..self.max_events).into_iter().map(move |event_index| {
+            let iter = (0..self.max_events).map(move |event_index| {
                 let mut record = [0; EventRecord::SIZE];
                 r.read_exact(&mut record)?;
 

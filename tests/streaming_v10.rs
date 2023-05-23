@@ -8,7 +8,7 @@ const TRACE: &str = "test_resources/fixtures/streaming/v10/trace.psf";
 
 fn open_trace_file(trace_path: &str) -> File {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(trace_path);
-    File::open(&path).unwrap()
+    File::open(path).unwrap()
 }
 
 struct TestRecorderData {
