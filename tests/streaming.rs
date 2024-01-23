@@ -6,6 +6,7 @@ use trace_recorder_parser::{streaming::event::*, streaming::*, time::*, types::*
 
 const TRACE_V10: &str = "test_resources/fixtures/streaming/v10/trace.psf";
 const TRACE_V12: &str = "test_resources/fixtures/streaming/v12/trace.psf";
+const TRACE_V13: &str = "test_resources/fixtures/streaming/v13/trace.psf";
 
 fn open_trace_file(trace_path: &str) -> File {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(trace_path);
@@ -48,6 +49,17 @@ fn streaming_v12_smoke() {
     common_tests(CommonTestConfig {
         trace_path: TRACE_V12,
         expected_trace_format_version: 12,
+        expected_platform_cfg_version_minor: 2,
+        initial_event_count: 6,
+    });
+}
+
+// git tag: Tz4/4.8/v4.8.0.hotfix1
+#[test]
+fn streaming_v13_smoke() {
+    common_tests(CommonTestConfig {
+        trace_path: TRACE_V13,
+        expected_trace_format_version: 13,
         expected_platform_cfg_version_minor: 2,
         initial_event_count: 6,
     });

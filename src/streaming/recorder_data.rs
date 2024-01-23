@@ -19,7 +19,7 @@ impl RecorderData {
         let header = HeaderInfo::read(r)?;
 
         debug!("Reading timestamp info");
-        let timestamp_info = TimestampInfo::read(r, header.endianness)?;
+        let timestamp_info = TimestampInfo::read(r, header.endianness, header.format_version)?;
 
         debug!("Reading entry table");
         let entry_table = EntryTable::read(r, header.endianness)?;

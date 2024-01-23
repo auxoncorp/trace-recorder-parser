@@ -16,15 +16,31 @@ pub struct TimestampInfo {
 }
 
 impl TimestampInfo {
-    pub(crate) fn read<R: Read>(r: &mut R, endianness: Endianness) -> Result<Self, Error> {
+    pub(crate) fn read<R: Read>(
+        r: &mut R,
+        endianness: Endianness,
+        format_version: u16,
+    ) -> Result<Self, Error> {
         let mut r = ByteOrdered::new(r, byteordered::Endianness::from(endianness));
 
         let hwtc_type = r.read_u32()?;
         let timer_type =
             TimerCounter::from_hwtc_type(hwtc_type).ok_or(Error::InvalidTimerCounter(hwtc_type))?;
-        // NOTE: we assume TRC_BASE_TYPE and TRC_UNSIGNED_BASE_TYPE are 32-bit
-        let timer_frequency = Frequency(r.read_u32()?);
-        let timer_period = r.read_u32()?;
+
+        let timer_frequency;
+        let timer_period;
+
+        if format_version == 10 || format_version == 12 {
+            // NOTE: we assume TRC_BASE_TYPE and TRC_UNSIGNED_BASE_TYPE are 32-bit
+            timer_frequency = Frequency(r.read_u32()?);
+            timer_period = r.read_u32()?;
+        } else {
+            // v13+
+            timer_period = r.read_u32()?;
+            // NOTE: we assume TRC_BASE_TYPE and TRC_UNSIGNED_BASE_TYPE are 32-bit
+            timer_frequency = Frequency(r.read_u32()?);
+        }
+
         let timer_wraparounds = r.read_u32()?;
         let os_tick_rate_hz = Frequency(r.read_u32()?);
         let latest_timestamp = Timestamp(r.read_u32()?.into());

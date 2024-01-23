@@ -55,28 +55,42 @@ impl HeaderInfo {
         if kernel_port != KernelPortIdentity::FreeRtos {
             warn!("Kernel port {kernel_port} is not officially supported");
         }
-        if format_version != 10 {
+        if format_version != 10 && format_version != 12 && format_version != 13 {
             warn!("Version {format_version} is not officially supported");
         }
 
-        // Everything after this is version specific
+        // Everything after platform is version specific
         let options = r.read_u32()?;
         let irq_priority_order = options & 0x01;
         let num_cores = r.read_u32()?;
         let isr_tail_chaining_threshold = r.read_u32()?;
 
-        let mut platform_cfg: [u8; 8] = [0; 8];
-        r.read_exact(&mut platform_cfg)?;
-        let platform_cfg = TrimmedString::from_raw(&platform_cfg).into();
+        let platform_cfg_version_patch;
+        let platform_cfg_version_minor;
+        let platform_cfg_version_major;
+        let mut platform_cfg_bytes: [u8; 8] = [0; 8];
 
-        let patch = r.read_u16()?;
-        let minor = r.read_u8()?;
-        let major = r.read_u8()?;
+        if format_version == 10 || format_version == 12 {
+            r.read_exact(&mut platform_cfg_bytes)?;
+
+            platform_cfg_version_patch = r.read_u16()?;
+            platform_cfg_version_minor = r.read_u8()?;
+            platform_cfg_version_major = r.read_u8()?;
+        } else {
+            // v13+
+            platform_cfg_version_patch = r.read_u16()?;
+            platform_cfg_version_minor = r.read_u8()?;
+            platform_cfg_version_major = r.read_u8()?;
+
+            r.read_exact(&mut platform_cfg_bytes)?;
+        }
+
         let platform_cfg_version = PlatformCfgVersion {
-            major,
-            minor,
-            patch,
+            major: platform_cfg_version_major,
+            minor: platform_cfg_version_minor,
+            patch: platform_cfg_version_patch,
         };
+        let platform_cfg = TrimmedString::from_raw(&platform_cfg_bytes).into();
 
         Ok(Self {
             endianness,
