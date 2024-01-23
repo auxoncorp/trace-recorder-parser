@@ -505,6 +505,10 @@ pub enum Event {
 }
 
 impl Event {
+    /// Get the event count (sequence number).
+    /// NOTE:
+    /// * V10: TraceStart reports 1 (doesn't track the internal header/timestamp-info/etc)
+    /// * V12: TraceStart reports 6 (does track the internal header/timestamp-info/etc)
     pub fn event_count(&self) -> EventCount {
         use Event::*;
         match self {

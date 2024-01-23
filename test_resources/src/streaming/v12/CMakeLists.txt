@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(trc-streaming-v10 LANGUAGES C)
+project(trc-streaming-v12 LANGUAGES C)
 
 if(NOT CMAKE_C_STANDARD)
   set(CMAKE_C_STANDARD 99)
@@ -31,7 +31,7 @@ endif()
 
 set(
     TRACE_RECORDER_TAG
-    "Tz4/4.6/v4.6.6"
+    "Tz4/4.7/v4.7.0"
     CACHE
     STRING
     "Sets the TraceRecorderSource git tag to use")
@@ -105,7 +105,7 @@ target_compile_definitions(
     ${PROJECT_NAME}
     PRIVATE
     TRC_CFG_TEST_MODE
-    TRC_CFG_STREAM_PORT_TRACE_FILE="${CMAKE_SOURCE_DIR}/../../../fixtures/streaming/v10/trace.psf")
+    TRC_CFG_STREAM_PORT_TRACE_FILE="${CMAKE_SOURCE_DIR}/../../../fixtures/streaming/v12/trace.psf")
 
 target_compile_options(
     ${PROJECT_NAME}
@@ -130,4 +130,4 @@ add_custom_command(
     POST_BUILD
     MAIN_DEPENDENCY ${PROJECT_NAME}
     COMMAND ./${PROJECT_NAME}
-    COMMENT "Running the v10 test application")
+    COMMENT "Running the v12 test application")

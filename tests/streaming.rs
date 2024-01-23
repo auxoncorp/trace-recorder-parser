@@ -4,7 +4,8 @@ use std::fs::File;
 use std::path::Path;
 use trace_recorder_parser::{streaming::event::*, streaming::*, time::*, types::*};
 
-const TRACE: &str = "test_resources/fixtures/streaming/v10/trace.psf";
+const TRACE_V10: &str = "test_resources/fixtures/streaming/v10/trace.psf";
+const TRACE_V12: &str = "test_resources/fixtures/streaming/v12/trace.psf";
 
 fn open_trace_file(trace_path: &str) -> File {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(trace_path);
@@ -30,9 +31,37 @@ impl TestRecorderData {
     }
 }
 
+// git tag: Tz4/4.6/v4.6.6
 #[test]
 fn streaming_v10_smoke() {
-    let mut f = open_trace_file(TRACE);
+    common_tests(CommonTestConfig {
+        trace_path: TRACE_V10,
+        expected_trace_format_version: 10,
+        expected_platform_cfg_version_minor: 0,
+        initial_event_count: 1,
+    });
+}
+
+// git tag: Tz4/4.7/v4.7.0
+#[test]
+fn streaming_v12_smoke() {
+    common_tests(CommonTestConfig {
+        trace_path: TRACE_V12,
+        expected_trace_format_version: 12,
+        expected_platform_cfg_version_minor: 2,
+        initial_event_count: 6,
+    });
+}
+
+struct CommonTestConfig {
+    trace_path: &'static str,
+    expected_trace_format_version: u16,
+    expected_platform_cfg_version_minor: u8,
+    initial_event_count: u16,
+}
+
+fn common_tests(cfg: CommonTestConfig) {
+    let mut f = open_trace_file(cfg.trace_path);
     let rd = RecorderData::read(&mut f).unwrap();
 
     assert_eq!(rd.protocol, Protocol::Streaming);
@@ -43,7 +72,7 @@ fn streaming_v10_smoke() {
         rd.header,
         HeaderInfo {
             endianness: Endianness::Little,
-            format_version: 10,
+            format_version: cfg.expected_trace_format_version,
             kernel_version: rd.header.kernel_version,
             kernel_port: KernelPortIdentity::FreeRtos,
             options: 4,
@@ -53,7 +82,7 @@ fn streaming_v10_smoke() {
             platform_cfg: "FreeRTOS".to_owned(),
             platform_cfg_version: PlatformCfgVersion {
                 major: 1,
-                minor: 0,
+                minor: cfg.expected_platform_cfg_version_minor,
                 patch: 0,
             },
         }
@@ -100,7 +129,7 @@ fn streaming_v10_smoke() {
         let mut trd = TestRecorderData {
             rd,
             f,
-            event_cnt: 1,
+            event_cnt: cfg.initial_event_count,
             timestamp_ticks: 0,
         };
         trd.check_event(TraceStart);
