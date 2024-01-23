@@ -705,7 +705,7 @@ mod test {
         let out = "my int -1 = 23";
         let arg_bytes: Vec<u8> = i32::to_le_bytes(-1)
             .into_iter()
-            .chain(u32::to_le_bytes(23).into_iter())
+            .chain(u32::to_le_bytes(23))
             .collect();
         assert_eq!(
             format_symbol_string(
@@ -772,7 +772,7 @@ mod test {
         let out = "small int -4 = medium int -25";
         let arg_bytes: Vec<u8> = i8::to_le_bytes(-4)
             .into_iter()
-            .chain(i16::to_le_bytes(-25).into_iter())
+            .chain(i16::to_le_bytes(-25))
             .collect();
         assert_eq!(
             format_symbol_string(
@@ -790,7 +790,7 @@ mod test {
         );
         let arg_bytes: Vec<u8> = i32::to_le_bytes(-4_i8 as i32)
             .into_iter()
-            .chain(i32::to_le_bytes(-25_i16 as i32).into_iter())
+            .chain(i32::to_le_bytes(-25_i16 as i32))
             .collect();
         assert_eq!(
             format_symbol_string(

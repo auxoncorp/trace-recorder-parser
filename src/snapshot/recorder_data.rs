@@ -142,27 +142,22 @@ impl RecorderData {
         // This is used to calculate the index in the dynamic object table
         // (handle - 1 - nofStaticObjects = index)
         let num_objects_per_class: Vec<u16> = if is_using_16bit_handles {
-            let mut words = Vec::new();
-            words.resize(num_object_classes_u16_allocation_size_words, 0);
+            let mut words = vec![0; num_object_classes_u16_allocation_size_words];
             r.read_u16_into(&mut words)?;
             words
         } else {
-            let mut words = Vec::new();
-            words.resize(num_object_classes_u8_allocation_size_words, 0);
+            let mut words = vec![0; num_object_classes_u8_allocation_size_words];
             r.read_exact(&mut words)?;
             words.into_iter().map(|w| w.into()).collect()
         };
 
-        let mut name_len_per_class = Vec::new();
-        name_len_per_class.resize(num_object_classes_u8_allocation_size_words, 0);
+        let mut name_len_per_class = vec![0; num_object_classes_u8_allocation_size_words];
         r.read_exact(&mut name_len_per_class)?;
 
-        let mut total_bytes_per_class = Vec::new();
-        total_bytes_per_class.resize(num_object_classes_u8_allocation_size_words, 0);
+        let mut total_bytes_per_class = vec![0; num_object_classes_u8_allocation_size_words];
         r.read_exact(&mut total_bytes_per_class)?;
 
-        let mut start_index_of_class = Vec::new();
-        start_index_of_class.resize(num_object_classes_u16_allocation_size_words, 0);
+        let mut start_index_of_class = vec![0; num_object_classes_u16_allocation_size_words];
         r.read_u16_into(&mut start_index_of_class)?;
 
         let pos_at_prop_table = r.stream_position()?;
