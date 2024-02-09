@@ -55,14 +55,15 @@ impl HeaderInfo {
         if kernel_port != KernelPortIdentity::FreeRtos {
             warn!("Kernel port {kernel_port} is not officially supported");
         }
-        if format_version != 10 && format_version != 12 && format_version != 13 {
+        if format_version != 10 && !(12..=14).contains(&format_version) {
             warn!("Version {format_version} is not officially supported");
         }
 
         // Everything after platform is version specific
         let options = r.read_u32()?;
         let irq_priority_order = options & 0x01;
-        let num_cores = r.read_u32()?;
+        // v14+ puts TRC_STREAM_PORT_MULTISTREAM_SUPPORT in bits 8:9
+        let num_cores = r.read_u32()? & 0xFF;
         let isr_tail_chaining_threshold = r.read_u32()?;
 
         let platform_cfg_version_patch;
