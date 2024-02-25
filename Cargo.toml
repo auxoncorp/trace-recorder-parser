@@ -1,6 +1,6 @@
 [package]
 name = "trace-recorder-parser"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 authors = ["Jon Lamb <jon@auxon.io>"]
 description = "A Rust library to parse Percepio's TraceRecorder data"
@@ -13,13 +13,13 @@ exclude = ["test_resources/"]
 tracing = "0.1"
 thiserror = "1.0"
 derive_more = "0.99"
-ordered-float = "3.0"
+ordered-float = "4.2"
 byteordered = "0.6"
 
 # For the examples
 [dev-dependencies]
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-clap = { version = "3.2", features = ["derive"] }
+clap = { version = "4.5", features = ["derive"] }
 exitcode = "1.1"
 pretty_assertions = "1.4"
 
@@ -27,4 +27,4 @@ pretty_assertions = "1.4"
 # Used to prevent panics on broken pipes.
 # See:
 #   https://github.com/rust-lang/rust/issues/46016#issuecomment-605624865
-nix = "0.24"
+nix = { version = "0.28", features = ["signal"] }
