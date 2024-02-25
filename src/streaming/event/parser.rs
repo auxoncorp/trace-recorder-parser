@@ -1,6 +1,6 @@
 use crate::streaming::event::*;
 use crate::streaming::{EntryTable, Error};
-use crate::time::{Frequency, Ticks, Timestamp};
+use crate::time::{Frequency, Ticks};
 use crate::types::{
     format_symbol_string, Endianness, FormatString, FormattedString, Heap, ObjectClass,
     ObjectHandle, ObjectName, Priority, Protocol, SymbolString, TimerCounter, TrimmedString,

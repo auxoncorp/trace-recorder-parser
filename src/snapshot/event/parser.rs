@@ -1,10 +1,10 @@
 use crate::snapshot::event::*;
 use crate::snapshot::object_properties::ObjectPropertyTable;
 use crate::snapshot::symbol_table::SymbolTable;
-use crate::time::{DifferentialTimestamp, Dts16, Dts8, Timestamp};
+use crate::time::{DifferentialTimestamp, Dts16, Dts8};
 use crate::types::{
-    format_symbol_string, FormatString, FormattedString, FormattedStringError, ObjectClass,
-    ObjectHandle, ObjectName, Protocol, UserEventChannel,
+    format_symbol_string, FormatString, FormattedString, FormattedStringError, ObjectHandle,
+    ObjectName, Protocol, UserEventChannel,
 };
 use byteordered::{ByteOrdered, Endianness};
 use derive_more::From;
