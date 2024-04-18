@@ -604,6 +604,57 @@ impl Event {
     }
 }
 
+pub type DroppedEventCount = u64;
+
+/// Event counter that tracks rollovers and discontinuities.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
+#[display(fmt = "{}", "self.count()")]
+pub struct TrackingEventCounter {
+    count: u16,
+    rollovers: u32,
+}
+
+impl TrackingEventCounter {
+    /// Creates a new counter with an initial value of zero
+    pub const fn zero() -> Self {
+        Self {
+            count: 0,
+            rollovers: 0,
+        }
+    }
+
+    /// Sets the initial counter value and reset the rollover tracking.
+    pub fn set_initial_count(&mut self, count: EventCount) {
+        self.count = count.0;
+        self.rollovers = 0;
+    }
+
+    /// Updates the event count handling rollovers.
+    /// Returns the number of dropped events, if any.
+    /// NOTE: must be called at least once per event count type (u16) rollover interval
+    pub fn update(&mut self, event_count: EventCount) -> Option<DroppedEventCount> {
+        let prev_count = self.count();
+
+        // Handle rollover
+        if event_count.0 <= self.count {
+            self.rollovers += 1;
+        }
+        self.count = event_count.0;
+
+        let diff = self.count() - prev_count;
+        if diff != 1 {
+            // SAFETY: diff will always be >=1 due to the rollover handling above
+            Some(diff - 1)
+        } else {
+            None
+        }
+    }
+
+    pub fn count(&self) -> u64 {
+        u64::from(self.rollovers) << u16::BITS | u64::from(self.count)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -615,5 +666,47 @@ mod test {
             let et = EventType::from(eid);
             assert_eq!(eid, EventId::from(et));
         }
+    }
+
+    #[test]
+    fn event_counter_tracking() {
+        let mut ec = TrackingEventCounter::zero();
+        assert_eq!(ec.count(), 0);
+
+        // Reset initial count works
+        ec.set_initial_count(EventCount(u16::MAX));
+        assert_eq!(ec.count(), u16::MAX.into());
+
+        // Non-rollover discontinuities
+        ec.set_initial_count(EventCount(0));
+        assert_eq!(ec.count(), 0);
+        assert_eq!(ec.update(EventCount(10)), Some(9)); // Missed events 1..=9
+        assert_eq!(ec.count(), 10);
+        assert_eq!(ec.update(EventCount(12)), Some(1)); // Missed event 11
+        assert_eq!(ec.count(), 12);
+        assert_eq!(ec.update(EventCount(13)), None);
+        assert_eq!(ec.count(), 13);
+
+        // Rollover discontinuities
+        ec.set_initial_count(EventCount(10));
+        assert_eq!(ec.count(), 10);
+        assert_eq!(
+            ec.update(EventCount(10_u16.wrapping_add(u16::MAX))), // 9
+            Some(u64::from(u16::MAX - 1)) // Missed events 11..<wrap-around>..=8
+        );
+        assert_eq!(ec.count(), u64::from(u16::MAX) + 10);
+        assert_eq!(ec.update(EventCount(10)), None);
+        assert_eq!(ec.count(), u64::from(u16::MAX) + 11);
+        assert_eq!(ec.update(EventCount(12)), Some(1));
+        assert_eq!(ec.count(), u64::from(u16::MAX) + 13);
+
+        // Similar, but show that updating with same event count means a rollover
+        ec.set_initial_count(EventCount(10));
+        assert_eq!(ec.count(), 10);
+        assert_eq!(
+            ec.update(EventCount(10)),
+            Some(u64::from(u16::MAX)) // Missed events 11..<wrap-around>..=9
+        );
+        assert_eq!(ec.count(), u64::from(u16::MAX) + 11);
     }
 }
