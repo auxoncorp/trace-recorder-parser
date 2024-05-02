@@ -15,9 +15,21 @@ pub struct RecorderData {
 }
 
 impl RecorderData {
+    pub fn find<R: Read>(r: &mut R) -> Result<Self, Error> {
+        debug!("Finding header info");
+        let header = HeaderInfo::find(r)?;
+
+        Self::read_common(header, r)
+    }
+
     pub fn read<R: Read>(r: &mut R) -> Result<Self, Error> {
+        debug!("Reading header info");
         let header = HeaderInfo::read(r)?;
 
+        Self::read_common(header, r)
+    }
+
+    fn read_common<R: Read>(header: HeaderInfo, r: &mut R) -> Result<Self, Error> {
         debug!("Reading timestamp info");
         let timestamp_info = TimestampInfo::read(r, header.endianness, header.format_version)?;
 

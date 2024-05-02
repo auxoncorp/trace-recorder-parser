@@ -1,9 +1,6 @@
-#![deny(warnings, clippy::all)]
-
 use clap::Parser;
 use std::collections::BTreeMap;
-use std::fs::File;
-use std::path::PathBuf;
+use std::{fs::File, io::BufReader, path::PathBuf};
 use trace_recorder_parser::streaming::RecorderData;
 
 #[derive(Parser, Debug, Clone)]
@@ -40,17 +37,18 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
 
     try_init_tracing_subscriber()?;
 
-    let mut f = File::open(&opts.path)?;
+    let f = File::open(&opts.path)?;
+    let mut r = BufReader::new(f);
 
-    let mut rd = RecorderData::read(&mut f)?;
+    let mut rd = RecorderData::find(&mut r)?;
     println!("{rd:#?}");
 
     if !opts.no_events {
         let mut observed_type_counters = BTreeMap::new();
 
-        while let Some((event_code, event)) = rd.read_event(&mut f)? {
+        while let Some((event_code, event)) = rd.read_event(&mut r)? {
             let event_type = event_code.event_type();
-            println!("{event_type} : {event}");
+            println!("{event_type} : {event} : {}", event.event_count());
             *observed_type_counters.entry(event_type).or_insert(0) += 1_u64;
         }
 

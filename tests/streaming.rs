@@ -87,7 +87,7 @@ struct CommonTestConfig {
 
 fn common_tests(cfg: CommonTestConfig) {
     let mut f = open_trace_file(cfg.trace_path);
-    let rd = RecorderData::read(&mut f).unwrap();
+    let rd = RecorderData::find(&mut f).unwrap();
 
     assert_eq!(rd.protocol, Protocol::Streaming);
 

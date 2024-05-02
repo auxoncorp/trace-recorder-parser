@@ -3,6 +3,7 @@ use crate::types::{
     Endianness, KernelPortIdentity, KernelVersion, PlatformCfgVersion, TrimmedString,
 };
 use byteordered::ByteOrdered;
+use std::collections::VecDeque;
 use std::io::Read;
 use tracing::{debug, warn};
 
@@ -37,10 +38,39 @@ impl HeaderInfo {
         Ok(endianness)
     }
 
+    pub fn find<R: Read>(r: &mut R) -> Result<Self, Error> {
+        debug!("Searching for PSF word");
+        let mut r = ByteOrdered::native(r);
+        let mut psf_buf = VecDeque::with_capacity(4);
+        psf_buf.resize(4, 0_u8);
+        r.read_exact(psf_buf.make_contiguous())?;
+        loop {
+            match Self::read_psf_word(&mut psf_buf.clone()) {
+                Ok(endianness) => {
+                    debug!(%endianness, "Found PSF word");
+                    return Self::read_with_endianness(&mut r.into_inner(), endianness);
+                }
+                Err(Error::PSFEndiannessIdentifier(_)) => {
+                    psf_buf.push_back(r.read_u8()?);
+                    psf_buf.pop_front();
+                    continue;
+                }
+                Err(e) => {
+                    debug!("Failed to find PSF word");
+                    return Err(e);
+                }
+            }
+        }
+    }
+
     pub fn read<R: Read>(r: &mut R) -> Result<Self, Error> {
         let endianness = Self::read_psf_word(r)?;
+        Self::read_with_endianness(r, endianness)
+    }
 
-        // The remaining fields are endian-aware
+    /// Assumes the PSF word (u32) has already been read from the input
+    pub fn read_with_endianness<R: Read>(r: &mut R, endianness: Endianness) -> Result<Self, Error> {
+        // The remaining fields after PSF word are endian-aware
         let mut r = ByteOrdered::new(r, byteordered::Endianness::from(endianness));
 
         let format_version = r.read_u16()?;
