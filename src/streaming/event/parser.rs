@@ -46,7 +46,11 @@ impl EventParser {
     ) -> Result<Option<(EventCode, Event)>, Error> {
         let first_word = {
             let mut r = ByteOrdered::le(&mut r);
-            let word = r.read_u32()?;
+            let word = match r.read_u32() {
+                Ok(w) => w,
+                Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => return Ok(None),
+                Err(e) => return Err(e.into()),
+            };
             match word {
                 HeaderInfo::PSF_LITTLE_ENDIAN => {
                     return Err(Error::TraceRestarted(Endianness::Little))
