@@ -1,6 +1,6 @@
 use crate::streaming::entry_table::{Entry, EntryStates};
 use crate::streaming::event::{EventId, EventParameterCount};
-use crate::types::{FormattedStringError, ObjectHandle};
+use crate::types::{Endianness, FormattedStringError, ObjectHandle};
 use std::io;
 use thiserror::Error;
 
@@ -11,6 +11,9 @@ pub enum Error {
 
     #[error("Invalid PSF endianness identifier {0:X?}")]
     PSFEndiannessIdentifier(u32),
+
+    #[error("Encountered a trace restart PSF endianness identifier ({0:?})")]
+    TraceRestarted(Endianness),
 
     #[error(
         "Entry table symbol size must be greater than {} (TRC_ENTRY_TABLE_SLOT_SYMBOL_SIZE)",

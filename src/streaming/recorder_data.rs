@@ -1,6 +1,6 @@
 use crate::streaming::event::{Event, EventCode, EventParser};
 use crate::streaming::{EntryTable, Error, HeaderInfo, TimestampInfo};
-use crate::types::{Heap, Protocol};
+use crate::types::{Endianness, Heap, Protocol};
 use std::io::Read;
 use tracing::debug;
 
@@ -25,6 +25,14 @@ impl RecorderData {
     pub fn read<R: Read>(r: &mut R) -> Result<Self, Error> {
         debug!("Reading header info");
         let header = HeaderInfo::read(r)?;
+
+        Self::read_common(header, r)
+    }
+
+    /// Assumes the PSF word (u32) has already been read from the input
+    pub fn read_with_endianness<R: Read>(endianness: Endianness, r: &mut R) -> Result<Self, Error> {
+        debug!("Reading header info");
+        let header = HeaderInfo::read_with_endianness(endianness, r)?;
 
         Self::read_common(header, r)
     }

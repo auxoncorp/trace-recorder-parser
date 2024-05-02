@@ -22,6 +22,8 @@ static TraceBaseType_t g_timer_ticks = 0;
 static TraceStreamPortFile_t* g_trace_file = NULL;
 static TraceUnsignedBaseType_t g_heap = 0xFF00;
 
+static int g_trace_append_mode = 0;
+
 static void* not_traced_heap_ptr(void)
 {
     TraceUnsignedBaseType_t ptr = g_heap;
@@ -154,7 +156,14 @@ traceResult xTraceStreamPortOnTraceBegin(void)
 
     if (g_trace_file->pxFile == 0)
     {
-        g_trace_file->pxFile = fopen(TRC_CFG_STREAM_PORT_TRACE_FILE, "wb");
+        if (g_trace_append_mode == 0)
+        {
+            g_trace_file->pxFile = fopen(TRC_CFG_STREAM_PORT_TRACE_FILE, "wb");
+        }
+        else{
+            g_trace_file->pxFile = fopen(TRC_CFG_STREAM_PORT_TRACE_FILE, "ab");
+        }
+
         if(g_trace_file->pxFile == NULL)
         {
             printf("Could not open trace file, error code %d\n", errno);
@@ -279,6 +288,12 @@ int main(int argc, char **argv)
 
     assert(xTraceDiagnosticsCheckStatus() == TRC_SUCCESS);
 
+    assert(xTraceDisable() == TRC_SUCCESS);
+
+    /* restart */
+    g_trace_append_mode = 1;
+    assert(xTraceEnable(TRC_START) == TRC_SUCCESS);
+    assert(xTracePrintF(ch, "int %d, unsigned %u", -2, 32) == TRC_SUCCESS);
     assert(xTraceDisable() == TRC_SUCCESS);
 
     return EXIT_SUCCESS;

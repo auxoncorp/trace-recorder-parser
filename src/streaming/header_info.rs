@@ -27,7 +27,7 @@ impl HeaderInfo {
     pub const PSF_BIG_ENDIAN: u32 = 0x00_46_53_50;
 
     pub fn read_psf_word<R: Read>(r: &mut R) -> Result<Endianness, Error> {
-        let mut r = ByteOrdered::native(r);
+        let mut r = ByteOrdered::le(r);
         let mut psf = [0; 4];
         r.read_exact(&mut psf)?;
         let endianness = match u32::from_le_bytes(psf) {
@@ -48,7 +48,7 @@ impl HeaderInfo {
             match Self::read_psf_word(&mut psf_buf.clone()) {
                 Ok(endianness) => {
                     debug!(%endianness, "Found PSF word");
-                    return Self::read_with_endianness(&mut r.into_inner(), endianness);
+                    return Self::read_with_endianness(endianness, &mut r.into_inner());
                 }
                 Err(Error::PSFEndiannessIdentifier(_)) => {
                     psf_buf.push_back(r.read_u8()?);
@@ -65,11 +65,11 @@ impl HeaderInfo {
 
     pub fn read<R: Read>(r: &mut R) -> Result<Self, Error> {
         let endianness = Self::read_psf_word(r)?;
-        Self::read_with_endianness(r, endianness)
+        Self::read_with_endianness(endianness, r)
     }
 
     /// Assumes the PSF word (u32) has already been read from the input
-    pub fn read_with_endianness<R: Read>(r: &mut R, endianness: Endianness) -> Result<Self, Error> {
+    pub fn read_with_endianness<R: Read>(endianness: Endianness, r: &mut R) -> Result<Self, Error> {
         // The remaining fields after PSF word are endian-aware
         let mut r = ByteOrdered::new(r, byteordered::Endianness::from(endianness));
 

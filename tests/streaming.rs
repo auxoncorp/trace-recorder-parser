@@ -1,7 +1,6 @@
-#![deny(warnings, clippy::all)]
-
 use pretty_assertions::assert_eq;
 use std::fs::File;
+use std::io::Read;
 use std::path::Path;
 use trace_recorder_parser::{streaming::event::*, streaming::*, time::*, types::*};
 
@@ -15,14 +14,17 @@ fn open_trace_file(trace_path: &str) -> File {
     File::open(path).unwrap()
 }
 
-struct TestRecorderData {
+struct TestRecorderData<R: Read> {
     rd: RecorderData,
-    f: File,
+    f: R,
     event_cnt: u16,
     timestamp_ticks: u64,
 }
 
-impl TestRecorderData {
+impl<R> TestRecorderData<R>
+where
+    R: Read,
+{
     pub fn check_event(&mut self, typ: EventType) {
         let (ec, ev) = self.rd.read_event(&mut self.f).unwrap().unwrap();
         assert_eq!(ec.event_type(), typ);
@@ -42,6 +44,8 @@ fn streaming_v10_smoke() {
         expected_trace_format_version: 10,
         expected_platform_cfg_version_minor: 0,
         initial_event_count: 1,
+        latest_timestamp: Timestamp::zero(),
+        high_water_mark: 0,
     });
 }
 
@@ -53,6 +57,8 @@ fn streaming_v12_smoke() {
         expected_trace_format_version: 12,
         expected_platform_cfg_version_minor: 2,
         initial_event_count: 6,
+        latest_timestamp: Timestamp::zero(),
+        high_water_mark: 0,
     });
 }
 
@@ -64,6 +70,8 @@ fn streaming_v13_smoke() {
         expected_trace_format_version: 13,
         expected_platform_cfg_version_minor: 2,
         initial_event_count: 6,
+        latest_timestamp: Timestamp::zero(),
+        high_water_mark: 0,
     });
 }
 
@@ -75,7 +83,63 @@ fn streaming_v14_smoke() {
         expected_trace_format_version: 14,
         expected_platform_cfg_version_minor: 2,
         initial_event_count: 6,
+        latest_timestamp: Timestamp::zero(),
+        high_water_mark: 0,
     });
+}
+
+#[test]
+fn streaming_v14_garbage_with_trace_restart() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(TRACE_V14);
+    let trace_data = std::fs::read(path).unwrap();
+    let garbage = vec![0x11, 0x22, 0x33];
+
+    let mut data = Vec::new();
+    data.extend_from_slice(&garbage);
+    data.extend_from_slice(&trace_data);
+
+    let cfg0 = CommonTestConfig {
+        trace_path: TRACE_V14,
+        expected_trace_format_version: 14,
+        expected_platform_cfg_version_minor: 2,
+        initial_event_count: 6,
+        latest_timestamp: Timestamp::zero(),
+        high_water_mark: 0,
+    };
+    let mut reader = data.as_slice();
+
+    let mut rd0 = RecorderData::find(&mut reader).unwrap();
+    check_recorder_data(&rd0, &cfg0);
+
+    for _ in 0..52 {
+        let _ = rd0.read_event(&mut reader).unwrap().unwrap();
+    }
+    let next_psf_word = match rd0.read_event(&mut reader) {
+        Err(Error::TraceRestarted(endianness)) => endianness,
+        _ => panic!("Expected TraceRestarted error"),
+    };
+
+    let cfg1 = CommonTestConfig {
+        trace_path: TRACE_V14,
+        expected_trace_format_version: 14,
+        expected_platform_cfg_version_minor: 2,
+        initial_event_count: 6,
+        latest_timestamp: Timestamp::from(Ticks::new(51)),
+        high_water_mark: 4,
+    };
+    let rd1 = RecorderData::read_with_endianness(next_psf_word, &mut reader).unwrap();
+    check_recorder_data(&rd1, &cfg1);
+
+    {
+        use EventType::*;
+        let mut trd = TestRecorderData {
+            rd: rd1,
+            f: reader,
+            event_cnt: 70,
+            timestamp_ticks: 52,
+        };
+        trd.check_event(TraceStart);
+    }
 }
 
 struct CommonTestConfig {
@@ -83,12 +147,11 @@ struct CommonTestConfig {
     expected_trace_format_version: u16,
     expected_platform_cfg_version_minor: u8,
     initial_event_count: u16,
+    latest_timestamp: Timestamp,
+    high_water_mark: u32,
 }
 
-fn common_tests(cfg: CommonTestConfig) {
-    let mut f = open_trace_file(cfg.trace_path);
-    let rd = RecorderData::find(&mut f).unwrap();
-
+fn check_recorder_data(rd: &RecorderData, cfg: &CommonTestConfig) {
     assert_eq!(rd.protocol, Protocol::Streaming);
 
     let kernel_version: [u8; 2] = rd.header.kernel_version.into();
@@ -123,7 +186,7 @@ fn common_tests(cfg: CommonTestConfig) {
             timer_period: 0,
             timer_wraparounds: 0,
             os_tick_rate_hz: rd.timestamp_info.os_tick_rate_hz,
-            latest_timestamp: Timestamp::zero(),
+            latest_timestamp: cfg.latest_timestamp,
             os_tick_count: 0,
         },
     );
@@ -144,10 +207,17 @@ fn common_tests(cfg: CommonTestConfig) {
         rd.system_heap(),
         &Heap {
             current: 0,
-            high_water_mark: 0,
+            high_water_mark: cfg.high_water_mark,
             max: 32768,
         }
     );
+}
+
+fn common_tests(cfg: CommonTestConfig) {
+    let mut f = open_trace_file(cfg.trace_path);
+    let rd = RecorderData::find(&mut f).unwrap();
+
+    check_recorder_data(&rd, &cfg);
 
     {
         use EventType::*;

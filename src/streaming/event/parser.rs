@@ -1,5 +1,5 @@
 use crate::streaming::event::*;
-use crate::streaming::{EntryTable, Error};
+use crate::streaming::{EntryTable, Error, HeaderInfo};
 use crate::time::{Frequency, Ticks};
 use crate::types::{
     format_symbol_string, Endianness, FormatString, FormattedString, Heap, ObjectClass,
@@ -41,12 +41,25 @@ impl EventParser {
 
     pub fn next_event<R: Read>(
         &mut self,
-        r: &mut R,
+        mut r: &mut R,
         entry_table: &mut EntryTable,
     ) -> Result<Option<(EventCode, Event)>, Error> {
+        let first_word = {
+            let mut r = ByteOrdered::le(&mut r);
+            let word = r.read_u32()?;
+            match word {
+                HeaderInfo::PSF_LITTLE_ENDIAN => {
+                    return Err(Error::TraceRestarted(Endianness::Little))
+                }
+                HeaderInfo::PSF_BIG_ENDIAN => return Err(Error::TraceRestarted(Endianness::Big)),
+                _ => word.to_le_bytes(),
+            }
+        };
+
+        let mut first_word_reader = ByteOrdered::new(first_word.as_slice(), self.endianness);
         let mut r = ByteOrdered::new(r, self.endianness);
 
-        let event_code = match r.read_u16() {
+        let event_code = match first_word_reader.read_u16() {
             Ok(ec) => EventCode(ec),
             Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => return Ok(None),
             Err(e) => return Err(e.into()),
@@ -54,7 +67,7 @@ impl EventParser {
 
         let event_type = event_code.event_type();
         let event_id = event_code.event_id();
-        let event_count = EventCount(r.read_u16()?);
+        let event_count = EventCount(first_word_reader.read_u16()?);
         let timestamp = Timestamp(r.read_u32()?.into());
         let num_params = event_code.parameter_count();
 

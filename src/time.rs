@@ -69,6 +69,10 @@ impl Ticks {
     pub const fn get_raw(&self) -> u32 {
         self.0
     }
+
+    pub fn new(ticks: u32) -> Self {
+        Self(ticks)
+    }
 }
 
 /// Timestamp (in ticks).
