@@ -408,6 +408,67 @@ impl EventParser {
                 ))
             }
 
+            EventType::MutexCreate => {
+                let handle: ObjectHandle = object_handle(&mut r, event_id)?;
+                let _unused = r.read_u32()?;
+                let entry = entry_table.entry(handle);
+                entry.set_class(ObjectClass::Mutex);
+                let event = MutexCreateEvent {
+                    event_count,
+                    timestamp,
+                    handle,
+                    name: entry.symbol.clone().map(ObjectName::from),
+                };
+                Some((event_code, Event::MutexCreate(event)))
+            }
+
+            EventType::MutexGive | EventType::MutexGiveBlock | EventType::MutexGiveRecursive => {
+                let handle: ObjectHandle = object_handle(&mut r, event_id)?;
+                let entry = entry_table.entry(handle);
+                entry.set_class(ObjectClass::Mutex);
+                let event = MutexEvent {
+                    event_count,
+                    timestamp,
+                    handle,
+                    name: entry.symbol.clone().map(ObjectName::from),
+                    ticks_to_wait: None,
+                };
+                Some((
+                    event_code,
+                    match event_type {
+                            EventType::MutexGive => Event::MutexGive(event),
+                            EventType::MutexGiveBlock => Event::MutexGiveBlock(event),
+                            _ /*EventType::MutexGiveRecursive*/ => Event::MutexGiveRecursive(event),
+                        },
+                ))
+            }
+
+            EventType::MutexTake
+            | EventType::MutexTakeBlock
+            | EventType::MutexTakeRecursive
+            | EventType::MutexTakeRecursiveBlock => {
+                let handle: ObjectHandle = object_handle(&mut r, event_id)?;
+                let ticks_to_wait = Some(Ticks(r.read_u32()?));
+                let entry = entry_table.entry(handle);
+                entry.set_class(ObjectClass::Mutex);
+                let event = MutexEvent {
+                    event_count,
+                    timestamp,
+                    handle,
+                    name: entry.symbol.clone().map(ObjectName::from),
+                    ticks_to_wait,
+                };
+                Some((
+                    event_code,
+                    match event_type {
+                            EventType::MutexTake => Event::MutexTake(event),
+                            EventType::MutexTakeBlock => Event::MutexTakeBlock(event),
+                            EventType::MutexTakeRecursive => Event::MutexTakeRecursive(event),
+                            _ /*EventType::MutexTakeRecursiveBlock*/ => Event::MutexTakeRecursiveBlock(event),
+                        },
+                ))
+            }
+
             EventType::SemaphoreBinaryCreate => {
                 let handle: ObjectHandle = object_handle(&mut r, event_id)?;
                 let _unused = r.read_u32()?;

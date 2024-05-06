@@ -338,6 +338,7 @@ pub type TaskName = ObjectName;
 pub type IsrName = ObjectName;
 pub type QueueName = ObjectName;
 pub type SemaphoreName = ObjectName;
+pub type MutexName = ObjectName;
 
 impl From<SymbolString> for ObjectName {
     fn from(s: SymbolString) -> Self {

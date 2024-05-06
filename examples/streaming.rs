@@ -1,7 +1,8 @@
 use clap::Parser;
 use std::collections::BTreeMap;
 use std::{fs::File, io::BufReader, path::PathBuf};
-use trace_recorder_parser::streaming::RecorderData;
+use trace_recorder_parser::streaming::{Error, RecorderData};
+use tracing::{error, warn};
 
 #[derive(Parser, Debug, Clone)]
 #[clap(name = "streaming example", version, about = "Parse streaming data from file", long_about = None)]
@@ -35,7 +36,7 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
 
     reset_signal_pipe_handler()?;
 
-    try_init_tracing_subscriber()?;
+    tracing_subscriber::fmt::init();
 
     let f = File::open(&opts.path)?;
     let mut r = BufReader::new(f);
@@ -46,7 +47,23 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
     if !opts.no_events {
         let mut observed_type_counters = BTreeMap::new();
 
-        while let Some((event_code, event)) = rd.read_event(&mut r)? {
+        loop {
+            let (event_code, event) = match rd.read_event(&mut r) {
+                Ok(Some((ec, ev))) => (ec, ev),
+                Ok(None) => break,
+                Err(e) => match e {
+                    Error::TraceRestarted(psf_start_word_endianness) => {
+                        warn!("Detected a restarted trace stream");
+                        rd = RecorderData::read_with_endianness(psf_start_word_endianness, &mut r)?;
+                        continue;
+                    }
+                    _ => {
+                        error!("{e}");
+                        continue;
+                    }
+                },
+            };
+
             let event_type = event_code.event_type();
             println!("{event_type} : {event} : {}", event.event_count());
             *observed_type_counters.entry(event_type).or_insert(0) += 1_u64;
@@ -59,24 +76,6 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
         println!("----------------------------");
     }
 
-    Ok(())
-}
-
-fn try_init_tracing_subscriber() -> Result<(), Box<dyn std::error::Error>> {
-    let builder = tracing_subscriber::fmt::Subscriber::builder();
-    let env_filter = std::env::var(tracing_subscriber::EnvFilter::DEFAULT_ENV)
-        .map(tracing_subscriber::EnvFilter::new)
-        .unwrap_or_else(|_| {
-            tracing_subscriber::EnvFilter::new(format!(
-                "{}={}",
-                env!("CARGO_PKG_NAME").replace('-', "_"),
-                tracing::Level::WARN
-            ))
-        });
-    let builder = builder.with_env_filter(env_filter);
-    let subscriber = builder.finish();
-    use tracing_subscriber::util::SubscriberInitExt;
-    subscriber.try_init()?;
     Ok(())
 }
 

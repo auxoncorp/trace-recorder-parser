@@ -5,6 +5,10 @@ use derive_more::{Binary, Deref, Display, From, Into, LowerHex, Octal, UpperHex}
 pub use base::BaseEvent;
 pub use isr::{IsrBeginEvent, IsrDefineEvent, IsrEvent, IsrResumeEvent};
 pub use memory::{MemoryAllocEvent, MemoryEvent, MemoryFreeEvent};
+pub use mutex::{
+    MutexCreateEvent, MutexEvent, MutexGiveBlockEvent, MutexGiveEvent, MutexGiveRecursiveEvent,
+    MutexTakeBlockEvent, MutexTakeEvent, MutexTakeRecursiveBlockEvent, MutexTakeRecursiveEvent,
+};
 pub use object_name::ObjectNameEvent;
 pub use parser::EventParser;
 pub use queue::{
@@ -30,6 +34,7 @@ pub use user::UserEvent;
 pub mod base;
 pub mod isr;
 pub mod memory;
+pub mod mutex;
 pub mod object_name;
 pub mod parser;
 pub mod queue;
@@ -172,6 +177,8 @@ pub enum EventType {
     TaskCreate,
     #[display(fmt = "QUEUE_CREATE")]
     QueueCreate,
+    #[display(fmt = "MUTEX_CREATE")]
+    MutexCreate,
     #[display(fmt = "SEMAPHORE_BINARY_CREATE")]
     SemaphoreBinaryCreate,
     #[display(fmt = "SEMAPHORE_COUNTING_CREATE")]
@@ -217,6 +224,21 @@ pub enum EventType {
     QueueSendFrontBlock,
     #[display(fmt = "QUEUE_SEND_FRONT_FROM_ISR")]
     QueueSendFrontFromIsr,
+
+    #[display(fmt = "MUTEX_GIVE")]
+    MutexGive,
+    #[display(fmt = "MUTEX_GIVE_BLOCK")]
+    MutexGiveBlock,
+    #[display(fmt = "MUTEX_GIVE_RECURSIVE")]
+    MutexGiveRecursive,
+    #[display(fmt = "MUTEX_TAKE")]
+    MutexTake,
+    #[display(fmt = "MUTEX_TAKE_BLOCK")]
+    MutexTakeBlock,
+    #[display(fmt = "MUTEX_TAKE_RECURSIVE")]
+    MutexTakeRecursive,
+    #[display(fmt = "MUTEX_TAKE_RECURSIVE_BLOCK")]
+    MutexTakeRecursiveBlock,
 
     #[display(fmt = "SEMAPHORE_GIVE")]
     SemaphoreGive,
@@ -267,6 +289,7 @@ impl From<EventId> for EventType {
             0x10 => TaskCreate,
             0x11 => QueueCreate,
             0x12 => SemaphoreBinaryCreate,
+            0x13 => MutexCreate,
             0x16 => SemaphoreCountingCreate,
 
             0x30 => TaskReady,
@@ -290,6 +313,14 @@ impl From<EventId> for EventType {
             0xC0 => QueueSendFront,
             0xC2 => QueueSendFrontBlock,
             0xC3 => QueueSendFrontFromIsr,
+
+            0x52 => MutexGive,
+            0x58 => MutexGiveBlock,
+            0xC5 => MutexGiveRecursive,
+            0x62 => MutexTake,
+            0x68 => MutexTakeBlock,
+            0xC7 => MutexTakeRecursive,
+            0xF6 => MutexTakeRecursiveBlock,
 
             0x51 => SemaphoreGive,
             0x57 => SemaphoreGiveBlock,
@@ -326,6 +357,7 @@ impl From<EventType> for EventId {
             TaskCreate => 0x10,
             QueueCreate => 0x11,
             SemaphoreBinaryCreate => 0x12,
+            MutexCreate => 0x13,
             SemaphoreCountingCreate => 0x16,
 
             TaskReady => 0x30,
@@ -349,6 +381,14 @@ impl From<EventType> for EventId {
             QueueSendFront => 0xC0,
             QueueSendFrontBlock => 0xC2,
             QueueSendFrontFromIsr => 0xC3,
+
+            MutexGive => 0x52,
+            MutexGiveBlock => 0x58,
+            MutexGiveRecursive => 0xC5,
+            MutexTake => 0x62,
+            MutexTakeBlock => 0x68,
+            MutexTakeRecursive => 0xC7,
+            MutexTakeRecursiveBlock => 0xF6,
 
             SemaphoreGive => 0x51,
             SemaphoreGiveBlock => 0x57,
@@ -384,7 +424,11 @@ impl EventType {
                 return None
             }
 
-            TaskCreate | QueueCreate | SemaphoreCountingCreate | SemaphoreBinaryCreate => 2,
+            TaskCreate
+            | QueueCreate
+            | MutexCreate
+            | SemaphoreCountingCreate
+            | SemaphoreBinaryCreate => 2,
 
             TaskReady | TaskSwitchIsrBegin | TaskSwitchIsrResume | TaskSwitchTaskBegin
             | TaskSwitchTaskResume => 1,
@@ -400,6 +444,9 @@ impl EventType {
             | QueueSendFrontFromIsr => 2,
 
             QueueReceive | QueueReceiveBlock | QueuePeek | QueuePeekBlock => 3,
+
+            MutexGive | MutexGiveBlock | MutexGiveRecursive => 1,
+            MutexTake | MutexTakeBlock | MutexTakeRecursive | MutexTakeRecursiveBlock => 2,
 
             SemaphoreGive | SemaphoreGiveBlock | SemaphoreGiveFromIsr | SemaphoreTakeFromIsr => 2,
 
@@ -431,6 +478,8 @@ pub enum Event {
     TaskCreate(TaskCreateEvent),
     #[display(fmt = "QueueCreate({_0})")]
     QueueCreate(QueueCreateEvent),
+    #[display(fmt = "MutexCreate({_0})")]
+    MutexCreate(MutexCreateEvent),
     #[display(fmt = "SemaphoreBinaryCreate({_0})")]
     SemaphoreBinaryCreate(SemaphoreCreateEvent),
     #[display(fmt = "SemaphoreCountingCreate({_0})")]
@@ -477,6 +526,21 @@ pub enum Event {
     #[display(fmt = "QueueSendFrontFromIsr({_0})")]
     QueueSendFrontFromIsr(QueueSendFrontFromIsrEvent),
 
+    #[display(fmt = "MutexGive({_0})")]
+    MutexGive(MutexGiveEvent),
+    #[display(fmt = "MutexGiveBlock({_0})")]
+    MutexGiveBlock(MutexGiveBlockEvent),
+    #[display(fmt = "MutexGiveRecursive({_0})")]
+    MutexGiveRecursive(MutexGiveRecursiveEvent),
+    #[display(fmt = "MutexTake({_0})")]
+    MutexTake(MutexTakeEvent),
+    #[display(fmt = "MutexTakeBlock({_0})")]
+    MutexTakeBlock(MutexTakeBlockEvent),
+    #[display(fmt = "MutexTakeRecursive({_0})")]
+    MutexTakeRecursive(MutexTakeRecursiveEvent),
+    #[display(fmt = "MutexTakeRecursiveBlock({_0})")]
+    MutexTakeRecursiveBlock(MutexTakeRecursiveBlockEvent),
+
     #[display(fmt = "SemaphoreGive({_0})")]
     SemaphoreGive(SemaphoreGiveEvent),
     #[display(fmt = "SemaphoreGiveBlock({_0})")]
@@ -521,6 +585,7 @@ impl Event {
             IsrDefine(e) => e.event_count,
             TaskCreate(e) => e.event_count,
             QueueCreate(e) => e.event_count,
+            MutexCreate(e) => e.event_count,
             SemaphoreBinaryCreate(e) => e.event_count,
             SemaphoreCountingCreate(e) => e.event_count,
             TaskReady(e) => e.event_count,
@@ -542,6 +607,13 @@ impl Event {
             QueueSendFront(e) => e.event_count,
             QueueSendFrontBlock(e) => e.event_count,
             QueueSendFrontFromIsr(e) => e.event_count,
+            MutexGive(e) => e.event_count,
+            MutexGiveBlock(e) => e.event_count,
+            MutexGiveRecursive(e) => e.event_count,
+            MutexTake(e) => e.event_count,
+            MutexTakeBlock(e) => e.event_count,
+            MutexTakeRecursive(e) => e.event_count,
+            MutexTakeRecursiveBlock(e) => e.event_count,
             SemaphoreGive(e) => e.event_count,
             SemaphoreGiveBlock(e) => e.event_count,
             SemaphoreGiveFromIsr(e) => e.event_count,
@@ -568,6 +640,7 @@ impl Event {
             IsrDefine(e) => e.timestamp,
             TaskCreate(e) => e.timestamp,
             QueueCreate(e) => e.timestamp,
+            MutexCreate(e) => e.timestamp,
             SemaphoreBinaryCreate(e) => e.timestamp,
             SemaphoreCountingCreate(e) => e.timestamp,
             TaskReady(e) => e.timestamp,
@@ -589,6 +662,13 @@ impl Event {
             QueueSendFront(e) => e.timestamp,
             QueueSendFrontBlock(e) => e.timestamp,
             QueueSendFrontFromIsr(e) => e.timestamp,
+            MutexGive(e) => e.timestamp,
+            MutexGiveBlock(e) => e.timestamp,
+            MutexGiveRecursive(e) => e.timestamp,
+            MutexTake(e) => e.timestamp,
+            MutexTakeBlock(e) => e.timestamp,
+            MutexTakeRecursive(e) => e.timestamp,
+            MutexTakeRecursiveBlock(e) => e.timestamp,
             SemaphoreGive(e) => e.timestamp,
             SemaphoreGiveBlock(e) => e.timestamp,
             SemaphoreGiveFromIsr(e) => e.timestamp,
