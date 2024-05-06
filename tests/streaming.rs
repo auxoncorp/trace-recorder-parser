@@ -276,7 +276,7 @@ fn common_tests(cfg: CommonTestConfig) {
         trd.check_event(SemaphoreTakeFromIsr);
         trd.check_event(SemaphoreTakeFromIsr);
         trd.check_event(UserEvent(3.into()));
-        trd.check_event(Unknown(0x7A.into()));
+        trd.check_event(TaskDelay);
         trd.check_event(QueueReceiveBlock);
         trd.check_event(UnusedStack);
     }

@@ -189,6 +189,16 @@ pub enum EventType {
     TaskSwitchTaskResume,
     #[display(fmt = "TASK_ACTIVATE")]
     TaskActivate,
+    #[display(fmt = "TASK_DELAY_UNTIL")]
+    TaskDelayUntil,
+    #[display(fmt = "TASK_DELAY")]
+    TaskDelay,
+    #[display(fmt = "TASK_SUSPEND")]
+    TaskSuspend,
+    #[display(fmt = "TASK_RESUME")]
+    TaskResume,
+    #[display(fmt = "TASK_RESUME_FROM_ISR")]
+    TaskResumeFromIsr,
 
     #[display(fmt = "MEMORY_ALLOC")]
     MemoryAlloc,
@@ -327,6 +337,11 @@ impl From<EventId> for EventType {
             0x35 => TaskSwitchTaskBegin,
             0x36 => TaskSwitchTaskResume,
             0x37 => TaskActivate,
+            0x79 => TaskDelayUntil,
+            0x7A => TaskDelay,
+            0x7B => TaskSuspend,
+            0x7C => TaskResume,
+            0x7D => TaskResumeFromIsr,
 
             0x38 => MemoryAlloc,
             0x39 => MemoryFree,
@@ -411,6 +426,11 @@ impl From<EventType> for EventId {
             TaskSwitchTaskBegin => 0x35,
             TaskSwitchTaskResume => 0x36,
             TaskActivate => 0x37,
+            TaskDelayUntil => 0x79,
+            TaskDelay => 0x7A,
+            TaskSuspend => 0x7B,
+            TaskResume => 0x7C,
+            TaskResumeFromIsr => 0x7D,
 
             MemoryAlloc => 0x38,
             MemoryFree => 0x39,
@@ -519,7 +539,7 @@ impl EventType {
 
             UnusedStack => 2,
 
-            _ /* Failed events */ => return None,
+            _ /* Event types not handled */ => return None,
         })
     }
 }
