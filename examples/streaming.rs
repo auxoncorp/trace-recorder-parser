@@ -70,6 +70,11 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         println!("----------------------------");
+        for (handle, entry) in rd.entry_table.entries().iter() {
+            println!("[{}]: {:?} : {:?}", handle, entry.class, entry.symbol);
+        }
+
+        println!("----------------------------");
         for (t, count) in observed_type_counters.into_iter() {
             println!("  {t} : {count}");
         }

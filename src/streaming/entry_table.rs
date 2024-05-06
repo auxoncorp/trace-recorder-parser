@@ -32,6 +32,10 @@ impl Default for EntryTable {
 }
 
 impl EntryTable {
+    pub fn entries(&self) -> &BTreeMap<ObjectHandle, Entry> {
+        &self.0
+    }
+
     pub fn symbol(&self, handle: ObjectHandle) -> Option<&SymbolString> {
         self.0.get(&handle).and_then(|e| e.symbol.as_ref())
     }
