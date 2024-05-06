@@ -311,6 +311,45 @@ impl EventParser {
                 Some((event_code, Event::TaskActivate(event)))
             }
 
+            EventType::TaskNotify | EventType::TaskNotifyFromIsr => {
+                let handle: ObjectHandle = object_handle(&mut r, event_id)?;
+                let entry = entry_table.entry(handle);
+                let event = TaskNotifyEvent {
+                    event_count,
+                    timestamp,
+                    handle,
+                    task_name: entry.symbol.clone().map(ObjectName::from),
+                    ticks_to_wait: None,
+                };
+                Some((
+                    event_code,
+                    match event_type {
+                            EventType::TaskNotify => Event::TaskNotify(event),
+                            _ /*EventType::TaskNotifyFromIsr*/ => Event::TaskNotifyFromIsr(event),
+                        },
+                ))
+            }
+
+            EventType::TaskNotifyWait | EventType::TaskNotifyWaitBlock => {
+                let handle: ObjectHandle = object_handle(&mut r, event_id)?;
+                let ticks_to_wait = Some(Ticks(r.read_u32()?));
+                let entry = entry_table.entry(handle);
+                let event = TaskNotifyEvent {
+                    event_count,
+                    timestamp,
+                    handle,
+                    task_name: entry.symbol.clone().map(ObjectName::from),
+                    ticks_to_wait,
+                };
+                Some((
+                    event_code,
+                    match event_type {
+                            EventType::TaskNotifyWait => Event::TaskNotifyWait(event),
+                            _ /*EventType::TaskNotifyWaitBlock*/ => Event::TaskNotifyWaitBlock(event),
+                        },
+                ))
+            }
+
             EventType::MemoryAlloc | EventType::MemoryFree => {
                 let address = r.read_u32()?;
                 let size = r.read_u32()?;

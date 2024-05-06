@@ -26,6 +26,9 @@ pub use task::{
     TaskActivateEvent, TaskBeginEvent, TaskCreateEvent, TaskEvent, TaskPriorityDisinheritEvent,
     TaskPriorityEvent, TaskPriorityInheritEvent, TaskReadyEvent, TaskResumeEvent,
 };
+pub use task_notify::{
+    TaskNotifyEvent, TaskNotifyFromIsrEvent, TaskNotifyWaitBlockEvent, TaskNotifyWaitEvent,
+};
 pub use trace_start::TraceStartEvent;
 pub use ts_config::TsConfigEvent;
 pub use unused_stack::UnusedStackEvent;
@@ -40,6 +43,7 @@ pub mod parser;
 pub mod queue;
 pub mod semaphore;
 pub mod task;
+pub mod task_notify;
 pub mod trace_start;
 pub mod ts_config;
 pub mod unused_stack;
@@ -199,6 +203,16 @@ pub enum EventType {
     TaskResume,
     #[display(fmt = "TASK_RESUME_FROM_ISR")]
     TaskResumeFromIsr,
+    #[display(fmt = "TASK_NOTIFY")]
+    TaskNotify,
+    #[display(fmt = "TASK_NOTIFY_WAIT")]
+    TaskNotifyWait,
+    #[display(fmt = "TASK_NOTIFY_WAIT_FAILED")]
+    TaskNotifyWaitFailed,
+    #[display(fmt = "TASK_NOTIFY_WAIT_BLOCK")]
+    TaskNotifyWaitBlock,
+    #[display(fmt = "TASK_NOTIFY_FROM_ISR")]
+    TaskNotifyFromIsr,
 
     #[display(fmt = "MEMORY_ALLOC")]
     MemoryAlloc,
@@ -342,6 +356,11 @@ impl From<EventId> for EventType {
             0x7B => TaskSuspend,
             0x7C => TaskResume,
             0x7D => TaskResumeFromIsr,
+            0xC9 => TaskNotify,
+            0xCA => TaskNotifyWait,
+            0xCB => TaskNotifyWaitBlock,
+            0xCC => TaskNotifyWaitFailed,
+            0xCD => TaskNotifyFromIsr,
 
             0x38 => MemoryAlloc,
             0x39 => MemoryFree,
@@ -431,6 +450,11 @@ impl From<EventType> for EventId {
             TaskSuspend => 0x7B,
             TaskResume => 0x7C,
             TaskResumeFromIsr => 0x7D,
+            TaskNotify => 0xC9,
+            TaskNotifyWait => 0xCA,
+            TaskNotifyWaitBlock => 0xCB,
+            TaskNotifyWaitFailed => 0xCC,
+            TaskNotifyFromIsr => 0xCD,
 
             MemoryAlloc => 0x38,
             MemoryFree => 0x39,
@@ -518,6 +542,9 @@ impl EventType {
             TaskReady | TaskSwitchIsrBegin | TaskSwitchIsrResume | TaskSwitchTaskBegin
             | TaskSwitchTaskResume => 1,
 
+            TaskNotify | TaskNotifyFromIsr => 1,
+            TaskNotifyWait | TaskNotifyWaitBlock => 2,
+
             MemoryAlloc | MemoryFree => 2,
 
             QueueSend
@@ -584,6 +611,15 @@ pub enum Event {
     TaskResume(TaskResumeEvent),
     #[display(fmt = "TaskActivate({_0})")]
     TaskActivate(TaskActivateEvent),
+
+    #[display(fmt = "TaskNotify({_0})")]
+    TaskNotify(TaskNotifyEvent),
+    #[display(fmt = "TaskNotifyFromIsr({_0})")]
+    TaskNotifyFromIsr(TaskNotifyFromIsrEvent),
+    #[display(fmt = "TaskNotifyWait({_0})")]
+    TaskNotifyWait(TaskNotifyWaitEvent),
+    #[display(fmt = "TaskNotifyWaitBlock({_0})")]
+    TaskNotifyWaitBlock(TaskNotifyWaitBlockEvent),
 
     #[display(fmt = "MemoryAlloc({_0})")]
     MemoryAlloc(MemoryAllocEvent),
@@ -681,6 +717,10 @@ impl Event {
             TaskBegin(e) => e.event_count,
             TaskResume(e) => e.event_count,
             TaskActivate(e) => e.event_count,
+            TaskNotify(e) => e.event_count,
+            TaskNotifyFromIsr(e) => e.event_count,
+            TaskNotifyWait(e) => e.event_count,
+            TaskNotifyWaitBlock(e) => e.event_count,
             MemoryAlloc(e) => e.event_count,
             MemoryFree(e) => e.event_count,
             QueueSend(e) => e.event_count,
@@ -736,6 +776,10 @@ impl Event {
             TaskBegin(e) => e.timestamp,
             TaskResume(e) => e.timestamp,
             TaskActivate(e) => e.timestamp,
+            TaskNotify(e) => e.timestamp,
+            TaskNotifyFromIsr(e) => e.timestamp,
+            TaskNotifyWait(e) => e.timestamp,
+            TaskNotifyWaitBlock(e) => e.timestamp,
             MemoryAlloc(e) => e.timestamp,
             MemoryFree(e) => e.timestamp,
             QueueSend(e) => e.timestamp,
