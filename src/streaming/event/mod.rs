@@ -175,15 +175,8 @@ pub enum EventType {
 
     #[display(fmt = "TASK_CREATE")]
     TaskCreate,
-    #[display(fmt = "QUEUE_CREATE")]
-    QueueCreate,
-    #[display(fmt = "MUTEX_CREATE")]
-    MutexCreate,
-    #[display(fmt = "SEMAPHORE_BINARY_CREATE")]
-    SemaphoreBinaryCreate,
-    #[display(fmt = "SEMAPHORE_COUNTING_CREATE")]
-    SemaphoreCountingCreate,
-
+    #[display(fmt = "TASK_CREATE_FAILED")]
+    TaskCreateFailed,
     #[display(fmt = "TASK_READY")]
     TaskReady,
     #[display(fmt = "TASK_SWITCH_ISR_BEGIN")]
@@ -202,20 +195,34 @@ pub enum EventType {
     #[display(fmt = "MEMORY_FREE")]
     MemoryFree,
 
+    #[display(fmt = "QUEUE_CREATE")]
+    QueueCreate,
+    #[display(fmt = "QUEUE_CREATE_FAILED")]
+    QueueCreateFailed,
     #[display(fmt = "QUEUE_SEND")]
     QueueSend,
+    #[display(fmt = "QUEUE_SEND_FAILED")]
+    QueueSendFailed,
     #[display(fmt = "QUEUE_SEND_BLOCK")]
     QueueSendBlock,
     #[display(fmt = "QUEUE_SEND_FROM_ISR")]
     QueueSendFromIsr,
+    #[display(fmt = "QUEUE_SEND_FROM_ISR_FAILED")]
+    QueueSendFromIsrFailed,
     #[display(fmt = "QUEUE_RECEIVE")]
     QueueReceive,
+    #[display(fmt = "QUEUE_RECEIVE_FAILED")]
+    QueueReceiveFailed,
     #[display(fmt = "QUEUE_RECEIVE_BLOCK")]
     QueueReceiveBlock,
     #[display(fmt = "QUEUE_RECEIVE_FROM_ISR")]
     QueueReceiveFromIsr,
+    #[display(fmt = "QUEUE_RECEIVE_FROM_ISR_FAILED")]
+    QueueReceiveFromIsrFailed,
     #[display(fmt = "QUEUE_PEEK")]
     QueuePeek,
+    #[display(fmt = "QUEUE_PEEK_FAILED")]
+    QueuePeekFailed,
     #[display(fmt = "QUEUE_PEEK_BLOCK")]
     QueuePeekBlock,
     #[display(fmt = "QUEUE_SEND_FRONT")]
@@ -225,14 +232,22 @@ pub enum EventType {
     #[display(fmt = "QUEUE_SEND_FRONT_FROM_ISR")]
     QueueSendFrontFromIsr,
 
+    #[display(fmt = "MUTEX_CREATE")]
+    MutexCreate,
+    #[display(fmt = "MUTEX_CREATE_FAILED")]
+    MutexCreateFailed,
     #[display(fmt = "MUTEX_GIVE")]
     MutexGive,
+    #[display(fmt = "MUTEX_GIVE_FAILED")]
+    MutexGiveFailed,
     #[display(fmt = "MUTEX_GIVE_BLOCK")]
     MutexGiveBlock,
     #[display(fmt = "MUTEX_GIVE_RECURSIVE")]
     MutexGiveRecursive,
     #[display(fmt = "MUTEX_TAKE")]
     MutexTake,
+    #[display(fmt = "MUTEX_TAKE_FAILED")]
+    MutexTakeFailed,
     #[display(fmt = "MUTEX_TAKE_BLOCK")]
     MutexTakeBlock,
     #[display(fmt = "MUTEX_TAKE_RECURSIVE")]
@@ -240,20 +255,38 @@ pub enum EventType {
     #[display(fmt = "MUTEX_TAKE_RECURSIVE_BLOCK")]
     MutexTakeRecursiveBlock,
 
+    #[display(fmt = "SEMAPHORE_BINARY_CREATE")]
+    SemaphoreBinaryCreate,
+    #[display(fmt = "SEMAPHORE_BINARY_CREATE_FAILED")]
+    SemaphoreBinaryCreateFailed,
+    #[display(fmt = "SEMAPHORE_COUNTING_CREATE")]
+    SemaphoreCountingCreate,
+    #[display(fmt = "SEMAPHORE_COUNTING_CREATE_FAILED")]
+    SemaphoreCountingCreateFailed,
     #[display(fmt = "SEMAPHORE_GIVE")]
     SemaphoreGive,
+    #[display(fmt = "SEMAPHORE_GIVE_FAILED")]
+    SemaphoreGiveFailed,
     #[display(fmt = "SEMAPHORE_GIVE_BLOCK")]
     SemaphoreGiveBlock,
     #[display(fmt = "SEMAPHORE_GIVE_FROM_ISR")]
     SemaphoreGiveFromIsr,
+    #[display(fmt = "SEMAPHORE_GIVE_FROM_ISR_FAILED")]
+    SemaphoreGiveFromIsrFailed,
     #[display(fmt = "SEMAPHORE_TAKE")]
     SemaphoreTake,
+    #[display(fmt = "SEMAPHORE_TAKE_FAILED")]
+    SemaphoreTakeFailed,
     #[display(fmt = "SEMAPHORE_TAKE_BLOCK")]
     SemaphoreTakeBlock,
     #[display(fmt = "SEMAPHORE_TAKE_FROM_ISR")]
     SemaphoreTakeFromIsr,
+    #[display(fmt = "SEMAPHORE_TAKE_FROM_ISR_FAILED")]
+    SemaphoreTakeFromIsrFailed,
     #[display(fmt = "SEMAPHORE_PEEK")]
     SemaphorePeek,
+    #[display(fmt = "SEMAPHORE_PEEK_FAILED")]
+    SemaphorePeekFailed,
     #[display(fmt = "SEMAPHORE_PEEK_BLOCK")]
     SemaphorePeekBlock,
 
@@ -287,11 +320,7 @@ impl From<EventId> for EventType {
             0x07 => DefineIsr,
 
             0x10 => TaskCreate,
-            0x11 => QueueCreate,
-            0x12 => SemaphoreBinaryCreate,
-            0x13 => MutexCreate,
-            0x16 => SemaphoreCountingCreate,
-
+            0x40 => TaskCreateFailed,
             0x30 => TaskReady,
             0x33 => TaskSwitchIsrBegin,
             0x34 => TaskSwitchIsrResume,
@@ -302,33 +331,53 @@ impl From<EventId> for EventType {
             0x38 => MemoryAlloc,
             0x39 => MemoryFree,
 
+            0x11 => QueueCreate,
+            0x41 => QueueCreateFailed,
             0x50 => QueueSend,
+            0x53 => QueueSendFailed,
             0x56 => QueueSendBlock,
             0x59 => QueueSendFromIsr,
+            0x5C => QueueSendFromIsrFailed,
             0x60 => QueueReceive,
+            0x63 => QueueReceiveFailed,
             0x66 => QueueReceiveBlock,
             0x69 => QueueReceiveFromIsr,
+            0x6C => QueueReceiveFromIsrFailed,
             0x70 => QueuePeek,
+            0x73 => QueuePeekFailed,
             0x76 => QueuePeekBlock,
             0xC0 => QueueSendFront,
             0xC2 => QueueSendFrontBlock,
             0xC3 => QueueSendFrontFromIsr,
 
+            0x13 => MutexCreate,
+            0x43 => MutexCreateFailed,
             0x52 => MutexGive,
+            0x55 => MutexGiveFailed,
             0x58 => MutexGiveBlock,
             0xC5 => MutexGiveRecursive,
             0x62 => MutexTake,
+            0x65 => MutexTakeFailed,
             0x68 => MutexTakeBlock,
             0xC7 => MutexTakeRecursive,
             0xF6 => MutexTakeRecursiveBlock,
 
+            0x12 => SemaphoreBinaryCreate,
+            0x42 => SemaphoreBinaryCreateFailed,
+            0x16 => SemaphoreCountingCreate,
+            0x46 => SemaphoreCountingCreateFailed,
             0x51 => SemaphoreGive,
+            0x54 => SemaphoreGiveFailed,
             0x57 => SemaphoreGiveBlock,
             0x5A => SemaphoreGiveFromIsr,
+            0x5D => SemaphoreGiveFromIsrFailed,
             0x61 => SemaphoreTake,
+            0x64 => SemaphoreTakeFailed,
             0x67 => SemaphoreTakeBlock,
             0x6A => SemaphoreTakeFromIsr,
+            0x6D => SemaphoreTakeFromIsrFailed,
             0x71 => SemaphorePeek,
+            0x74 => SemaphorePeekFailed,
             0x77 => SemaphorePeekBlock,
 
             raw @ 0x90..=0x9F => UserEvent(UserEventArgRecordCount(raw as u8 - 0x90)),
@@ -355,11 +404,7 @@ impl From<EventType> for EventId {
             DefineIsr => 0x07,
 
             TaskCreate => 0x10,
-            QueueCreate => 0x11,
-            SemaphoreBinaryCreate => 0x12,
-            MutexCreate => 0x13,
-            SemaphoreCountingCreate => 0x16,
-
+            TaskCreateFailed => 0x40,
             TaskReady => 0x30,
             TaskSwitchIsrBegin => 0x33,
             TaskSwitchIsrResume => 0x34,
@@ -370,33 +415,53 @@ impl From<EventType> for EventId {
             MemoryAlloc => 0x38,
             MemoryFree => 0x39,
 
+            QueueCreate => 0x11,
+            QueueCreateFailed => 0x41,
             QueueSend => 0x50,
+            QueueSendFailed => 0x53,
             QueueSendBlock => 0x56,
             QueueSendFromIsr => 0x59,
+            QueueSendFromIsrFailed => 0x5C,
             QueueReceive => 0x60,
+            QueueReceiveFailed => 0x63,
             QueueReceiveBlock => 0x66,
             QueueReceiveFromIsr => 0x69,
+            QueueReceiveFromIsrFailed => 0x6C,
             QueuePeek => 0x70,
+            QueuePeekFailed => 0x73,
             QueuePeekBlock => 0x76,
             QueueSendFront => 0xC0,
             QueueSendFrontBlock => 0xC2,
             QueueSendFrontFromIsr => 0xC3,
 
+            MutexCreate => 0x13,
+            MutexCreateFailed => 0x43,
             MutexGive => 0x52,
+            MutexGiveFailed => 0x55,
             MutexGiveBlock => 0x58,
             MutexGiveRecursive => 0xC5,
             MutexTake => 0x62,
+            MutexTakeFailed => 0x65,
             MutexTakeBlock => 0x68,
             MutexTakeRecursive => 0xC7,
             MutexTakeRecursiveBlock => 0xF6,
 
+            SemaphoreBinaryCreate => 0x12,
+            SemaphoreBinaryCreateFailed => 0x42,
+            SemaphoreCountingCreate => 0x16,
+            SemaphoreCountingCreateFailed => 0x46,
             SemaphoreGive => 0x51,
+            SemaphoreGiveFailed => 0x54,
             SemaphoreGiveBlock => 0x57,
             SemaphoreGiveFromIsr => 0x5A,
+            SemaphoreGiveFromIsrFailed => 0x5D,
             SemaphoreTake => 0x61,
+            SemaphoreTakeFailed => 0x64,
             SemaphoreTakeBlock => 0x67,
             SemaphoreTakeFromIsr => 0x6A,
+            SemaphoreTakeFromIsrFailed => 0x6D,
             SemaphorePeek => 0x71,
+            SemaphorePeekFailed => 0x74,
             SemaphorePeekBlock => 0x77,
 
             UserEvent(ac) => (0x90 + ac.0).into(),
@@ -453,6 +518,8 @@ impl EventType {
             SemaphoreTake | SemaphoreTakeBlock | SemaphorePeek | SemaphorePeekBlock => 3,
 
             UnusedStack => 2,
+
+            _ /* Failed events */ => return None,
         })
     }
 }
