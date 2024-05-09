@@ -1,5 +1,5 @@
 use derive_more::{
-    Add, AddAssign, Binary, Deref, Display, Into, LowerHex, MulAssign, Octal, Sum, UpperHex,
+    Add, AddAssign, Binary, Deref, Display, Into, LowerHex, MulAssign, Octal, Sub, Sum, UpperHex,
 };
 use std::ops;
 
@@ -53,6 +53,7 @@ impl Frequency {
     LowerHex,
     UpperHex,
     Add,
+    Sub,
     Sum,
     AddAssign,
     MulAssign,
@@ -96,6 +97,7 @@ impl Ticks {
     LowerHex,
     UpperHex,
     Add,
+    Sub,
     Sum,
     AddAssign,
     MulAssign,
