@@ -275,6 +275,17 @@ impl StreamingInstant {
         Self { lower: 0, upper: 0 }
     }
 
+    pub const fn new(lower: u32, upper: u32) -> Self {
+        Self { lower, upper }
+    }
+
+    pub const fn from_initial_value(initial_value: u64) -> Self {
+        Self {
+            lower: initial_value as u32,
+            upper: (initial_value >> 32) as u32,
+        }
+    }
+
     pub fn elapsed(&mut self, now: Timestamp) -> Timestamp {
         // Streaming protocol timestamps are always 32 bits
         let now = now.0 as u32;
@@ -348,5 +359,17 @@ mod test {
 
         let t2 = instant.elapsed(t1);
         assert_eq!(t0.ticks() + 16, t2.ticks());
+    }
+
+    #[test]
+    fn streaming_instant_construction() {
+        let mut t = StreamingInstant::from_initial_value(u64::from(u32::MAX) + 1);
+        assert_eq!(t.lower, 0);
+        assert_eq!(t.upper, 1);
+        let t0 = Timestamp(2);
+        let instant = t.elapsed(t0);
+        assert_eq!(t.lower, 2);
+        assert_eq!(t.upper, 1);
+        assert_eq!(instant.0, u64::from(u32::MAX) + 3);
     }
 }
