@@ -3,40 +3,29 @@ use crate::types::UserEventArgRecordCount;
 use derive_more::{Binary, Deref, Display, From, Into, LowerHex, Octal, UpperHex};
 
 pub use base::BaseEvent;
-pub use isr::{IsrBeginEvent, IsrDefineEvent, IsrEvent, IsrResumeEvent};
-pub use memory::{MemoryAllocEvent, MemoryEvent, MemoryFreeEvent};
-pub use mutex::{
-    MutexCreateEvent, MutexEvent, MutexGiveBlockEvent, MutexGiveEvent, MutexGiveRecursiveEvent,
-    MutexTakeBlockEvent, MutexTakeEvent, MutexTakeRecursiveBlockEvent, MutexTakeRecursiveEvent,
-};
 pub use object_name::ObjectNameEvent;
 pub use parser::EventParser;
-pub use queue::{
-    QueueCreateEvent, QueueEvent, QueuePeekBlockEvent, QueuePeekEvent, QueueReceiveBlockEvent,
-    QueueReceiveEvent, QueueReceiveFromIsrEvent, QueueSendBlockEvent, QueueSendEvent,
-    QueueSendFromIsrEvent, QueueSendFrontBlockEvent, QueueSendFrontEvent,
-    QueueSendFrontFromIsrEvent,
-};
-pub use semaphore::{
-    SemaphoreCreateEvent, SemaphoreEvent, SemaphoreGiveBlockEvent, SemaphoreGiveEvent,
-    SemaphoreGiveFromIsrEvent, SemaphorePeekBlockEvent, SemaphorePeekEvent,
-    SemaphoreTakeBlockEvent, SemaphoreTakeEvent, SemaphoreTakeFromIsrEvent,
-};
-pub use task::{
-    TaskActivateEvent, TaskBeginEvent, TaskCreateEvent, TaskEvent, TaskPriorityDisinheritEvent,
-    TaskPriorityEvent, TaskPriorityInheritEvent, TaskReadyEvent, TaskResumeEvent,
-};
-pub use task_notify::{
-    TaskNotifyEvent, TaskNotifyFromIsrEvent, TaskNotifyWaitBlockEvent, TaskNotifyWaitEvent,
-};
+
 pub use trace_start::TraceStartEvent;
 pub use ts_config::TsConfigEvent;
 pub use unused_stack::UnusedStackEvent;
 pub use user::UserEvent;
 
+pub use event_group::*;
+pub use isr::*;
+pub use memory::*;
+pub use message_buffer::*;
+pub use mutex::*;
+pub use queue::*;
+pub use semaphore::*;
+pub use task::*;
+pub use task_notify::*;
+
 pub mod base;
+pub mod event_group;
 pub mod isr;
 pub mod memory;
+pub mod message_buffer;
 pub mod mutex;
 pub mod object_name;
 pub mod parser;
@@ -314,6 +303,69 @@ pub enum EventType {
     #[display(fmt = "SEMAPHORE_PEEK_BLOCK")]
     SemaphorePeekBlock,
 
+    #[display(fmt = "TIMER_CREATE")]
+    TimerCreate,
+    #[display(fmt = "TIMER_START")]
+    TimerStart,
+    #[display(fmt = "TIMER_RESET")]
+    TimerReset,
+    #[display(fmt = "TIMER_STOP")]
+    TimerStop,
+    #[display(fmt = "TIMER_EXPIRED")]
+    TimerExpired,
+
+    #[display(fmt = "EVENTGROUP_CREATE")]
+    EventGroupCreate,
+    #[display(fmt = "EVENTGROUP_CREATE_FAILED")]
+    EventGroupCreateFailed,
+    #[display(fmt = "EVENTGROUP_SYNC")]
+    EventGroupSync,
+    #[display(fmt = "EVENTGROUP_WAITBITS")]
+    EventGroupWaitBits,
+    #[display(fmt = "EVENTGROUP_CLEARBITS")]
+    EventGroupClearBits,
+    #[display(fmt = "EVENTGROUP_CLEARBITS_FROM_ISR")]
+    EventGroupClearBitsFromIsr,
+    #[display(fmt = "EVENTGROUP_SETBITS")]
+    EventGroupSetBits,
+    #[display(fmt = "EVENTGROUP_SETBITS_FROM_ISR")]
+    EventGroupSetBitsFromIsr,
+    #[display(fmt = "EVENTGROUP_SYNC_BLOCK")]
+    EventGroupSyncBlock,
+    #[display(fmt = "EVENTGROUP_WAITBITS_BLOCK")]
+    EventGroupWaitBitsBlock,
+    #[display(fmt = "EVENTGROUP_SYNC_FAILED")]
+    EventGroupSyncFailed,
+    #[display(fmt = "EVENTGROUP_WAITBITS_FAILED")]
+    EventGroupWaitBitsFailed,
+
+    #[display(fmt = "MESSAGEBUFFER_CREATE")]
+    MessageBufferCreate,
+    #[display(fmt = "MESSAGEBUFFER_CREATE_FAILED")]
+    MessageBufferCreateFailed,
+    #[display(fmt = "MESSAGEBUFFER_SEND")]
+    MessageBufferSend,
+    #[display(fmt = "MESSAGEBUFFER_SEND_BLOCK")]
+    MessageBufferSendBlock,
+    #[display(fmt = "MESSAGEBUFFER_FAILED")]
+    MessageBufferSendFailed,
+    #[display(fmt = "MESSAGEBUFFER_RECEIVE")]
+    MessageBufferReceive,
+    #[display(fmt = "MESSAGEBUFFER_RECEIVE_BLOCK")]
+    MessageBufferReceiveBlock,
+    #[display(fmt = "MESSAGEBUFFER_RECEIVE_FAILED")]
+    MessageBufferReceiveFailed,
+    #[display(fmt = "MESSAGEBUFFER_SEND_FROM_ISR")]
+    MessageBufferSendFromIsr,
+    #[display(fmt = "MESSAGEBUFFER_SEND_FROM_ISR_FAILED")]
+    MessageBufferSendFromIsrFailed,
+    #[display(fmt = "MESSAGEBUFFER_RECEIVE_FROM_ISR")]
+    MessageBufferReceiveFromIsr,
+    #[display(fmt = "MESSAGEBUFFER_RECEIVE_FROM_ISR_FAILED")]
+    MessageBufferReceiveFromIsrFailed,
+    #[display(fmt = "MESSAGEBUFFER_RESET")]
+    MessageBufferReset,
+
     // User events
     // Note that user event code range is 0x90..=0x9F
     // Allow for 0-15 arguments (the arg count == word count, always 32 bits) is added to event code
@@ -414,6 +466,39 @@ impl From<EventId> for EventType {
             0x74 => SemaphorePeekFailed,
             0x77 => SemaphorePeekBlock,
 
+            0x14 => TimerCreate,
+            0xA0 => TimerStart,
+            0xA1 => TimerReset,
+            0xA2 => TimerStop,
+            0xD2 => TimerExpired,
+
+            0x15 => EventGroupCreate,
+            0x45 => EventGroupCreateFailed,
+            0xB0 => EventGroupSync,
+            0xB1 => EventGroupWaitBits,
+            0xB2 => EventGroupClearBits,
+            0xB3 => EventGroupClearBitsFromIsr,
+            0xB4 => EventGroupSetBits,
+            0xB5 => EventGroupSetBitsFromIsr,
+            0xB6 => EventGroupSyncBlock,
+            0xB7 => EventGroupWaitBitsBlock,
+            0xB8 => EventGroupSyncFailed,
+            0xB9 => EventGroupWaitBitsFailed,
+
+            0x19 => MessageBufferCreate,
+            0x4A => MessageBufferCreateFailed,
+            0xDE => MessageBufferSend,
+            0xDF => MessageBufferSendBlock,
+            0xE0 => MessageBufferSendFailed,
+            0xE1 => MessageBufferReceive,
+            0xE2 => MessageBufferReceiveBlock,
+            0xE3 => MessageBufferReceiveFailed,
+            0xE4 => MessageBufferSendFromIsr,
+            0xE5 => MessageBufferSendFromIsrFailed,
+            0xE6 => MessageBufferReceiveFromIsr,
+            0xE7 => MessageBufferReceiveFromIsrFailed,
+            0xE8 => MessageBufferReset,
+
             raw @ 0x90..=0x9F => UserEvent(UserEventArgRecordCount(raw as u8 - 0x90)),
 
             0xEB => UnusedStack,
@@ -508,6 +593,39 @@ impl From<EventType> for EventId {
             SemaphorePeekFailed => 0x74,
             SemaphorePeekBlock => 0x77,
 
+            TimerCreate => 0x14,
+            TimerStart => 0xA0,
+            TimerReset => 0xA1,
+            TimerStop => 0xA2,
+            TimerExpired => 0xD2,
+
+            EventGroupCreate => 0x15,
+            EventGroupCreateFailed => 0x45,
+            EventGroupSync => 0xB0,
+            EventGroupWaitBits => 0xB1,
+            EventGroupClearBits => 0xB2,
+            EventGroupClearBitsFromIsr => 0xB3,
+            EventGroupSetBits => 0xB4,
+            EventGroupSetBitsFromIsr => 0xB5,
+            EventGroupSyncBlock => 0xB6,
+            EventGroupWaitBitsBlock => 0xB7,
+            EventGroupSyncFailed => 0xB8,
+            EventGroupWaitBitsFailed => 0xB9,
+
+            MessageBufferCreate => 0x19,
+            MessageBufferCreateFailed => 0x4A,
+            MessageBufferSend => 0xDE,
+            MessageBufferSendBlock => 0xDF,
+            MessageBufferSendFailed => 0xE0,
+            MessageBufferReceive => 0xE1,
+            MessageBufferReceiveBlock => 0xE2,
+            MessageBufferReceiveFailed => 0xE3,
+            MessageBufferSendFromIsr => 0xE4,
+            MessageBufferSendFromIsrFailed => 0xE5,
+            MessageBufferReceiveFromIsr => 0xE6,
+            MessageBufferReceiveFromIsrFailed => 0xE7,
+            MessageBufferReset => 0xE8,
+
             UserEvent(ac) => (0x90 + ac.0).into(),
 
             UnusedStack => 0xEB,
@@ -565,6 +683,26 @@ impl EventType {
             SemaphoreTake | SemaphoreTakeBlock | SemaphorePeek | SemaphorePeekBlock => 3,
 
             UnusedStack => 2,
+
+            EventGroupCreate |
+            EventGroupSync |
+            EventGroupWaitBits |
+            EventGroupClearBits|
+            EventGroupClearBitsFromIsr |
+            EventGroupSetBits |
+            EventGroupSetBitsFromIsr |
+            EventGroupSyncBlock |
+            EventGroupWaitBitsBlock => 2,
+
+            MessageBufferCreate |
+            MessageBufferSend |
+            MessageBufferReceive |
+            MessageBufferSendFromIsr |
+            MessageBufferReceiveFromIsr |
+            MessageBufferReset => 2,
+
+            MessageBufferSendBlock |
+            MessageBufferReceiveBlock => 1,
 
             _ /* Event types not handled */ => return None,
         })
@@ -681,6 +819,42 @@ pub enum Event {
     #[display(fmt = "SemaphorePeekBlock({_0})")]
     SemaphorePeekBlock(SemaphorePeekBlockEvent),
 
+    #[display(fmt = "EventGroupCreate({_0})")]
+    EventGroupCreate(EventGroupCreateEvent),
+    #[display(fmt = "EventGroupSync({_0})")]
+    EventGroupSync(EventGroupSyncEvent),
+    #[display(fmt = "EventGroupWaitBits({_0})")]
+    EventGroupWaitBits(EventGroupWaitBitsEvent),
+    #[display(fmt = "EventGroupClearBits({_0})")]
+    EventGroupClearBits(EventGroupClearBitsEvent),
+    #[display(fmt = "EventGroupClearBitsFromIsr({_0})")]
+    EventGroupClearBitsFromIsr(EventGroupClearBitsFromIsrEvent),
+    #[display(fmt = "EventGroupSetBits({_0})")]
+    EventGroupSetBits(EventGroupSetBitsEvent),
+    #[display(fmt = "EventGroupSetBitsFromIsr({_0})")]
+    EventGroupSetBitsFromIsr(EventGroupSetBitsFromIsrEvent),
+    #[display(fmt = "EventGroupSyncBlock({_0})")]
+    EventGroupSyncBlock(EventGroupSyncBlockEvent),
+    #[display(fmt = "EventGroupWaitBitsBlock({_0})")]
+    EventGroupWaitBitsBlock(EventGroupWaitBitsBlockEvent),
+
+    #[display(fmt = "MessageBufferCreate({_0})")]
+    MessageBufferCreate(MessageBufferCreateEvent),
+    #[display(fmt = "MessageBufferSend({_0})")]
+    MessageBufferSend(MessageBufferSendEvent),
+    #[display(fmt = "MessageBufferReceive({_0})")]
+    MessageBufferReceive(MessageBufferReceiveEvent),
+    #[display(fmt = "MessageBufferSendFromIsr({_0})")]
+    MessageBufferSendFromIsr(MessageBufferSendFromIsrEvent),
+    #[display(fmt = "MessageBufferReceiveFromIsr({_0})")]
+    MessageBufferReceiveFromIsr(MessageBufferReceiveFromIsrEvent),
+    #[display(fmt = "MessageBufferReset({_0})")]
+    MessageBufferReset(MessageBufferResetEvent),
+    #[display(fmt = "MessageBufferSendBlock({_0})")]
+    MessageBufferSendBlock(MessageBufferSendBlockEvent),
+    #[display(fmt = "MessageBufferReceiveBlock({_0})")]
+    MessageBufferReceiveBlock(MessageBufferReceiveBlockEvent),
+
     #[display(fmt = "User({_0})")]
     User(UserEvent),
 
@@ -749,6 +923,23 @@ impl Event {
             SemaphoreTakeFromIsr(e) => e.event_count,
             SemaphorePeek(e) => e.event_count,
             SemaphorePeekBlock(e) => e.event_count,
+            EventGroupCreate(e) => e.event_count,
+            EventGroupSync(e) => e.event_count,
+            EventGroupWaitBits(e) => e.event_count,
+            EventGroupClearBits(e) => e.event_count,
+            EventGroupClearBitsFromIsr(e) => e.event_count,
+            EventGroupSetBits(e) => e.event_count,
+            EventGroupSetBitsFromIsr(e) => e.event_count,
+            EventGroupSyncBlock(e) => e.event_count,
+            EventGroupWaitBitsBlock(e) => e.event_count,
+            MessageBufferCreate(e) => e.event_count,
+            MessageBufferSend(e) => e.event_count,
+            MessageBufferReceive(e) => e.event_count,
+            MessageBufferSendFromIsr(e) => e.event_count,
+            MessageBufferReceiveFromIsr(e) => e.event_count,
+            MessageBufferReset(e) => e.event_count,
+            MessageBufferSendBlock(e) => e.event_count,
+            MessageBufferReceiveBlock(e) => e.event_count,
             User(e) => e.event_count,
             UnusedStack(e) => e.event_count,
             Unknown(e) => e.event_count,
@@ -808,6 +999,23 @@ impl Event {
             SemaphoreTakeFromIsr(e) => e.timestamp,
             SemaphorePeek(e) => e.timestamp,
             SemaphorePeekBlock(e) => e.timestamp,
+            EventGroupCreate(e) => e.timestamp,
+            EventGroupSync(e) => e.timestamp,
+            EventGroupWaitBits(e) => e.timestamp,
+            EventGroupClearBits(e) => e.timestamp,
+            EventGroupClearBitsFromIsr(e) => e.timestamp,
+            EventGroupSetBits(e) => e.timestamp,
+            EventGroupSetBitsFromIsr(e) => e.timestamp,
+            EventGroupSyncBlock(e) => e.timestamp,
+            EventGroupWaitBitsBlock(e) => e.timestamp,
+            MessageBufferCreate(e) => e.timestamp,
+            MessageBufferSend(e) => e.timestamp,
+            MessageBufferReceive(e) => e.timestamp,
+            MessageBufferSendFromIsr(e) => e.timestamp,
+            MessageBufferReceiveFromIsr(e) => e.timestamp,
+            MessageBufferReset(e) => e.timestamp,
+            MessageBufferSendBlock(e) => e.timestamp,
+            MessageBufferReceiveBlock(e) => e.timestamp,
             User(e) => e.timestamp,
             UnusedStack(e) => e.timestamp,
             Unknown(e) => e.timestamp,

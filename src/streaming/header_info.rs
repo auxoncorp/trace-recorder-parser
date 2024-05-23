@@ -40,6 +40,7 @@ impl HeaderInfo {
 
     pub fn find<R: Read>(r: &mut R) -> Result<Self, Error> {
         debug!("Searching for PSF word");
+        let mut offset = 0;
         let mut r = ByteOrdered::native(r);
         let mut psf_buf = VecDeque::with_capacity(4);
         psf_buf.resize(4, 0_u8);
@@ -47,10 +48,11 @@ impl HeaderInfo {
         loop {
             match Self::read_psf_word(&mut psf_buf.clone()) {
                 Ok(endianness) => {
-                    debug!(%endianness, "Found PSF word");
+                    debug!(%endianness, offset, "Found PSF word");
                     return Self::read_with_endianness(endianness, &mut r.into_inner());
                 }
                 Err(Error::PSFEndiannessIdentifier(_)) => {
+                    offset += 1;
                     psf_buf.push_back(r.read_u8()?);
                     psf_buf.pop_front();
                     continue;

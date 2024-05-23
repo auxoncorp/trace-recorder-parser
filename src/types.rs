@@ -339,6 +339,8 @@ pub type IsrName = ObjectName;
 pub type QueueName = ObjectName;
 pub type SemaphoreName = ObjectName;
 pub type MutexName = ObjectName;
+pub type EventGroupName = ObjectName;
+pub type MessageBufferName = ObjectName;
 
 impl From<SymbolString> for ObjectName {
     fn from(s: SymbolString) -> Self {

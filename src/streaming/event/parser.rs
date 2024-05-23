@@ -589,6 +589,111 @@ impl EventParser {
                 ))
             }
 
+            EventType::EventGroupCreate => {
+                let handle: ObjectHandle = object_handle(&mut r, event_id)?;
+                let event_bits = r.read_u32()?;
+                let entry = entry_table.entry(handle);
+                entry.set_class(ObjectClass::EventGroup);
+                let event = EventGroupCreateEvent {
+                    event_count,
+                    timestamp,
+                    handle,
+                    name: entry.symbol.clone().map(ObjectName::from),
+                    event_bits,
+                };
+                Some((event_code, Event::EventGroupCreate(event)))
+            }
+
+            EventType::EventGroupSync
+            | EventType::EventGroupWaitBits
+            | EventType::EventGroupClearBits
+            | EventType::EventGroupClearBitsFromIsr
+            | EventType::EventGroupSetBits
+            | EventType::EventGroupSetBitsFromIsr
+            | EventType::EventGroupSyncBlock
+            | EventType::EventGroupWaitBitsBlock => {
+                let handle = object_handle(&mut r, event_id)?;
+                let bits = r.read_u32()?;
+                let event = EventGroupEvent {
+                    event_count,
+                    timestamp,
+                    handle,
+                    name: entry_table.symbol(handle).cloned().map(ObjectName::from),
+                    bits,
+                };
+                Some((
+                    event_code,
+                    match event_type {
+                        EventType::EventGroupSync => Event::EventGroupSync(event),
+                        EventType::EventGroupWaitBits => Event::EventGroupWaitBits(event),
+                        EventType::EventGroupClearBits => Event::EventGroupClearBits(event),
+                        EventType::EventGroupClearBitsFromIsr => Event::EventGroupClearBitsFromIsr(event),
+                        EventType::EventGroupSetBits => Event::EventGroupSetBits(event),
+                        EventType::EventGroupSetBitsFromIsr => Event::EventGroupSetBitsFromIsr(event),
+                        EventType::EventGroupSyncBlock => Event::EventGroupSyncBlock(event),
+                        _ /*EventType::EventGroupWaitBitsBlock*/ => Event::EventGroupWaitBitsBlock(event),
+                    },
+                ))
+            }
+
+            EventType::MessageBufferCreate => {
+                let handle: ObjectHandle = object_handle(&mut r, event_id)?;
+                let buffer_size = r.read_u32()?;
+                let entry = entry_table.entry(handle);
+                entry.set_class(ObjectClass::MessageBuffer);
+                let event = MessageBufferCreateEvent {
+                    event_count,
+                    timestamp,
+                    handle,
+                    name: entry.symbol.clone().map(ObjectName::from),
+                    buffer_size,
+                };
+                Some((event_code, Event::MessageBufferCreate(event)))
+            }
+
+            EventType::MessageBufferSend
+            | EventType::MessageBufferReceive
+            | EventType::MessageBufferSendFromIsr
+            | EventType::MessageBufferReceiveFromIsr
+            | EventType::MessageBufferReset => {
+                let handle = object_handle(&mut r, event_id)?;
+                let bytes_in_buffer = r.read_u32()?;
+                let event = MessageBufferEvent {
+                    event_count,
+                    timestamp,
+                    handle,
+                    name: entry_table.symbol(handle).cloned().map(ObjectName::from),
+                    bytes_in_buffer,
+                };
+                Some((
+                    event_code,
+                    match event_type {
+                        EventType::MessageBufferSend => Event::MessageBufferSend(event),
+                        EventType::MessageBufferReceive => Event::MessageBufferReceive(event),
+                        EventType::MessageBufferSendFromIsr => Event::MessageBufferSendFromIsr(event),
+                        EventType::MessageBufferReceiveFromIsr => Event::MessageBufferReceiveFromIsr(event),
+                        _ /*EventType::MessageBufferReset*/ => Event::MessageBufferReset(event),
+                    },
+                ))
+            }
+
+            EventType::MessageBufferSendBlock | EventType::MessageBufferReceiveBlock => {
+                let handle = object_handle(&mut r, event_id)?;
+                let event = MessageBufferBlockEvent {
+                    event_count,
+                    timestamp,
+                    handle,
+                    name: entry_table.symbol(handle).cloned().map(ObjectName::from),
+                };
+                Some((
+                    event_code,
+                    match event_type {
+                        EventType::MessageBufferSendBlock => Event::MessageBufferSendBlock(event),
+                        _ /*EventType::MessageBufferReceiveBlock*/ => Event::MessageBufferReceiveBlock(event),
+                    },
+                ))
+            }
+
             EventType::UnusedStack => {
                 let handle = object_handle(&mut r, event_id)?;
                 let low_mark = r.read_u32()?;

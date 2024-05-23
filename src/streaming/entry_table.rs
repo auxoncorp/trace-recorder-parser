@@ -6,6 +6,7 @@ use crate::types::{
 use byteordered::ByteOrdered;
 use std::collections::BTreeMap;
 use std::io::Read;
+use tracing::debug;
 
 /// The address field of an entry is the key.
 /// This is either an object address (task, queue, etc) or the address of the
@@ -153,6 +154,7 @@ impl EntryTable {
         let num_entries = r.read_u32()?;
         let symbol_size = r.read_u32()? as usize;
         let state_count = r.read_u32()? as usize;
+        debug!(num_entries, symbol_size, state_count);
 
         if symbol_size < Entry::MIN_SYMBOL_SIZE {
             return Err(Error::InvalidEntryTableSymbolSize);
