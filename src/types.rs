@@ -2,6 +2,7 @@
 
 use byteordered::ByteOrdered;
 use derive_more::{Binary, Deref, Display, From, Into, LowerHex, Octal, UpperHex};
+use enum_iterator::Sequence;
 use ordered_float::OrderedFloat;
 use std::fmt::Write as _;
 use std::io;
@@ -405,6 +406,7 @@ impl UserEventChannel {
     LowerHex,
     UpperHex,
     Deref,
+    Sequence,
 )]
 #[display(fmt = "{_0}")]
 pub struct UserEventArgRecordCount(pub u8);

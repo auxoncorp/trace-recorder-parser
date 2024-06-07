@@ -1,6 +1,7 @@
 use crate::time::Timestamp;
 use crate::types::UserEventArgRecordCount;
 use derive_more::{Binary, Deref, Display, From, Into, LowerHex, Octal, UpperHex};
+use enum_iterator::Sequence;
 
 pub use base::BaseEvent;
 pub use object_name::ObjectNameEvent;
@@ -141,12 +142,13 @@ impl EventCode {
     Octal,
     LowerHex,
     UpperHex,
+    Sequence,
 )]
 #[display(fmt = "{_0:X}")]
 pub struct EventId(pub u16);
 
 /// Event types for streaming mode
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display, Sequence)]
 pub enum EventType {
     #[display(fmt = "NULL")]
     Null,
