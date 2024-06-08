@@ -331,7 +331,7 @@ impl std::ops::Deref for TrimmedString {
 pub const STARTUP_TASK_NAME: &str = "(startup)";
 pub const TZ_CTRL_TASK_NAME: &str = "TzCtrl";
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Into, Display)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, From, Into, Display)]
 #[display(fmt = "{_0}")]
 pub struct ObjectName(pub(crate) String);
 
@@ -363,7 +363,7 @@ impl std::ops::Deref for ObjectName {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Into, Display)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, From, Into, Display)]
 #[display(fmt = "{_0}")]
 pub struct Priority(pub(crate) u32);
 
