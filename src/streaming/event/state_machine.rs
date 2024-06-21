@@ -14,18 +14,8 @@ pub struct StateMachineCreateEvent {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
-#[display(fmt = "[{timestamp}]:{handle}:{state}")]
-pub struct StateMachineStateCreateEvent {
-    pub event_count: EventCount,
-    pub timestamp: Timestamp,
-
-    pub handle: ObjectHandle,
-    pub state: StateMachineStateName,
-}
-
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
 #[display(fmt = "[{timestamp}]:{handle}:{name}:{state}")]
-pub struct StateMachineStateChangeEvent {
+pub struct StateMachineStateEvent {
     pub event_count: EventCount,
     pub timestamp: Timestamp,
 
@@ -34,3 +24,6 @@ pub struct StateMachineStateChangeEvent {
     pub state_handle: ObjectHandle,
     pub state: StateMachineStateName,
 }
+
+pub type StateMachineStateCreateEvent = StateMachineStateEvent;
+pub type StateMachineStateChangeEvent = StateMachineStateEvent;
