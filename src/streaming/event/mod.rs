@@ -19,6 +19,7 @@ pub use message_buffer::*;
 pub use mutex::*;
 pub use queue::*;
 pub use semaphore::*;
+pub use state_machine::*;
 pub use task::*;
 pub use task_notify::*;
 
@@ -32,6 +33,7 @@ pub mod object_name;
 pub mod parser;
 pub mod queue;
 pub mod semaphore;
+pub mod state_machine;
 pub mod task;
 pub mod task_notify;
 pub mod trace_start;
@@ -368,6 +370,13 @@ pub enum EventType {
     #[display(fmt = "MESSAGEBUFFER_RESET")]
     MessageBufferReset,
 
+    #[display(fmt = "STATEMACHINE_STATE_CREATE")]
+    StateMachineStateCreate,
+    #[display(fmt = "STATEMACHINE_CREATE")]
+    StateMachineCreate,
+    #[display(fmt = "STATEMACHINE_STATE_CHANGE")]
+    StateMachineStateChange,
+
     // User events
     // Note that user event code range is 0x90..=0x9F
     // Allow for 0-15 arguments (the arg count == word count, always 32 bits) is added to event code
@@ -501,6 +510,10 @@ impl From<EventId> for EventType {
             0xE7 => MessageBufferReceiveFromIsrFailed,
             0xE8 => MessageBufferReset,
 
+            0xEC => StateMachineStateCreate,
+            0xED => StateMachineCreate,
+            0xEE => StateMachineStateChange,
+
             raw @ 0x90..=0x9F => UserEvent(UserEventArgRecordCount(raw as u8 - 0x90)),
 
             0xEB => UnusedStack,
@@ -628,6 +641,10 @@ impl From<EventType> for EventId {
             MessageBufferReceiveFromIsrFailed => 0xE7,
             MessageBufferReset => 0xE8,
 
+            StateMachineStateCreate => 0xEC,
+            StateMachineCreate => 0xED,
+            StateMachineStateChange => 0xEE,
+
             UserEvent(ac) => (0x90 + ac.0).into(),
 
             UnusedStack => 0xEB,
@@ -705,6 +722,8 @@ impl EventType {
 
             MessageBufferSendBlock |
             MessageBufferReceiveBlock => 1,
+
+            StateMachineCreate | StateMachineStateCreate | StateMachineStateChange => 2,
 
             _ /* Event types not handled */ => return None,
         })
@@ -857,6 +876,13 @@ pub enum Event {
     #[display(fmt = "MessageBufferReceiveBlock({_0})")]
     MessageBufferReceiveBlock(MessageBufferReceiveBlockEvent),
 
+    #[display(fmt = "StateMachineCreate({_0})")]
+    StateMachineCreate(StateMachineCreateEvent),
+    #[display(fmt = "StateMachineStateCreate({_0})")]
+    StateMachineStateCreate(StateMachineStateCreateEvent),
+    #[display(fmt = "StateMachineStateChange({_0})")]
+    StateMachineStateChange(StateMachineStateChangeEvent),
+
     #[display(fmt = "User({_0})")]
     User(UserEvent),
 
@@ -942,6 +968,9 @@ impl Event {
             MessageBufferReset(e) => e.event_count,
             MessageBufferSendBlock(e) => e.event_count,
             MessageBufferReceiveBlock(e) => e.event_count,
+            StateMachineCreate(e) => e.event_count,
+            StateMachineStateCreate(e) => e.event_count,
+            StateMachineStateChange(e) => e.event_count,
             User(e) => e.event_count,
             UnusedStack(e) => e.event_count,
             Unknown(e) => e.event_count,
@@ -1018,6 +1047,9 @@ impl Event {
             MessageBufferReset(e) => e.timestamp,
             MessageBufferSendBlock(e) => e.timestamp,
             MessageBufferReceiveBlock(e) => e.timestamp,
+            StateMachineCreate(e) => e.timestamp,
+            StateMachineStateCreate(e) => e.timestamp,
+            StateMachineStateChange(e) => e.timestamp,
             User(e) => e.timestamp,
             UnusedStack(e) => e.timestamp,
             Unknown(e) => e.timestamp,

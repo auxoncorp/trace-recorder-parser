@@ -287,6 +287,9 @@ impl RecorderData {
                         debug!("Found object property {obj} at {obj_start_pos}");
                         message_buffer_object_properties.insert(obj_handle, obj);
                     }
+                    ObjectClass::StateMachine => {
+                        // NOTE: unsupported
+                    }
                 }
             }
         }

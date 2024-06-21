@@ -212,6 +212,8 @@ pub enum ObjectClass {
     StreamBuffer = 7,
     #[display(fmt = "MessageBuffer")]
     MessageBuffer = 8,
+    #[display(fmt = "StateMachine")]
+    StateMachine = 9,
 }
 
 impl ObjectClass {
@@ -231,6 +233,7 @@ impl ObjectClass {
             EventGroup,
             StreamBuffer,
             MessageBuffer,
+            StateMachine,
         ]
     }
 
@@ -246,6 +249,7 @@ impl ObjectClass {
             EventGroup => 4,
             StreamBuffer => 4,
             MessageBuffer => 4,
+            StateMachine => 4,
         }
     }
 }
@@ -269,6 +273,7 @@ impl FromStr for ObjectClass {
             "eventgroup" => EventGroup,
             "streambuffer" => StreamBuffer,
             "messagebuffer" => MessageBuffer,
+            "statemachine" => StateMachine,
             _ => return Err(ParseObjectClassError),
         })
     }
@@ -342,6 +347,8 @@ pub type SemaphoreName = ObjectName;
 pub type MutexName = ObjectName;
 pub type EventGroupName = ObjectName;
 pub type MessageBufferName = ObjectName;
+pub type StateMachineName = ObjectName;
+pub type StateMachineStateName = ObjectName;
 
 impl From<SymbolString> for ObjectName {
     fn from(s: SymbolString) -> Self {

@@ -694,6 +694,62 @@ impl EventParser {
                 ))
             }
 
+            EventType::StateMachineCreate => {
+                let handle = object_handle(&mut r, event_id)?;
+                let _unused = r.read_u32()?;
+                let entry = entry_table.entry(handle);
+                entry.set_class(ObjectClass::StateMachine);
+                let sym = entry.symbol.as_ref().ok_or(Error::ObjectLookup(handle))?;
+                let event = StateMachineCreateEvent {
+                    event_count,
+                    timestamp,
+                    handle,
+                    name: sym.clone().into(),
+                };
+                Some((event_code, Event::StateMachineCreate(event)))
+            }
+
+            EventType::StateMachineStateCreate => {
+                let handle = object_handle(&mut r, event_id)?;
+                let _unused = r.read_u32()?;
+                let entry = entry_table.entry(handle);
+                entry.set_class(ObjectClass::StateMachine);
+                let sym = entry.symbol.as_ref().ok_or(Error::ObjectLookup(handle))?;
+                let event = StateMachineStateCreateEvent {
+                    event_count,
+                    timestamp,
+                    handle,
+                    state: sym.clone().into(),
+                };
+                Some((event_code, Event::StateMachineStateCreate(event)))
+            }
+
+            EventType::StateMachineStateChange => {
+                let state_machine_handle = object_handle(&mut r, event_id)?;
+                let state_handle = object_handle(&mut r, event_id)?;
+                let state_machine_sym = entry_table
+                    .entry(state_machine_handle)
+                    .symbol
+                    .as_ref()
+                    .map(|s| ObjectName::from(s.clone()))
+                    .ok_or(Error::ObjectLookup(state_machine_handle))?;
+                let state_sym = entry_table
+                    .entry(state_handle)
+                    .symbol
+                    .as_ref()
+                    .map(|s| ObjectName::from(s.clone()))
+                    .ok_or(Error::ObjectLookup(state_handle))?;
+                let event = StateMachineStateChangeEvent {
+                    event_count,
+                    timestamp,
+                    handle: state_machine_handle,
+                    name: state_machine_sym,
+                    state_handle,
+                    state: state_sym,
+                };
+                Some((event_code, Event::StateMachineStateChange(event)))
+            }
+
             EventType::UnusedStack => {
                 let handle = object_handle(&mut r, event_id)?;
                 let low_mark = r.read_u32()?;
