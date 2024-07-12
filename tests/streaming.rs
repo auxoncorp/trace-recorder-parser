@@ -46,6 +46,7 @@ fn streaming_v10_smoke() {
         initial_event_count: 1,
         latest_timestamp: Timestamp::zero(),
         high_water_mark: 0,
+        extra_user_events: false,
     });
 }
 
@@ -59,6 +60,7 @@ fn streaming_v12_smoke() {
         initial_event_count: 6,
         latest_timestamp: Timestamp::zero(),
         high_water_mark: 0,
+        extra_user_events: false,
     });
 }
 
@@ -72,6 +74,7 @@ fn streaming_v13_smoke() {
         initial_event_count: 6,
         latest_timestamp: Timestamp::zero(),
         high_water_mark: 0,
+        extra_user_events: false,
     });
 }
 
@@ -85,6 +88,7 @@ fn streaming_v14_smoke() {
         initial_event_count: 6,
         latest_timestamp: Timestamp::zero(),
         high_water_mark: 0,
+        extra_user_events: true,
     });
 }
 
@@ -105,18 +109,19 @@ fn streaming_v14_garbage_with_trace_restart() {
         initial_event_count: 6,
         latest_timestamp: Timestamp::zero(),
         high_water_mark: 0,
+        extra_user_events: true,
     };
     let mut reader = data.as_slice();
 
     let mut rd0 = RecorderData::find(&mut reader).unwrap();
     check_recorder_data(&rd0, &cfg0);
 
-    for _ in 0..52 {
+    for _ in 0..66 {
         let _ = rd0.read_event(&mut reader).unwrap().unwrap();
     }
     let next_psf_word = match rd0.read_event(&mut reader) {
         Err(Error::TraceRestarted(endianness)) => endianness,
-        _ => panic!("Expected TraceRestarted error"),
+        res => panic!("Expected TraceRestarted error. {res:?}"),
     };
 
     let cfg1 = CommonTestConfig {
@@ -124,8 +129,9 @@ fn streaming_v14_garbage_with_trace_restart() {
         expected_trace_format_version: 14,
         expected_platform_cfg_version_minor: 2,
         initial_event_count: 6,
-        latest_timestamp: Timestamp::from(Ticks::new(51)),
+        latest_timestamp: Timestamp::from(Ticks::new(65)),
         high_water_mark: 4,
+        extra_user_events: true,
     };
     let rd1 = RecorderData::read_with_endianness(next_psf_word, &mut reader).unwrap();
     check_recorder_data(&rd1, &cfg1);
@@ -135,8 +141,8 @@ fn streaming_v14_garbage_with_trace_restart() {
         let mut trd = TestRecorderData {
             rd: rd1,
             f: reader,
-            event_cnt: 70,
-            timestamp_ticks: 52,
+            event_cnt: 91,
+            timestamp_ticks: 66,
         };
         trd.check_event(TraceStart);
     }
@@ -149,6 +155,7 @@ struct CommonTestConfig {
     initial_event_count: u16,
     latest_timestamp: Timestamp,
     high_water_mark: u32,
+    extra_user_events: bool,
 }
 
 fn check_recorder_data(rd: &RecorderData, cfg: &CommonTestConfig) {
@@ -276,6 +283,20 @@ fn common_tests(cfg: CommonTestConfig) {
         trd.check_event(SemaphoreTakeFromIsr);
         trd.check_event(SemaphoreTakeFromIsr);
         trd.check_event(UserEvent(3.into()));
+        if cfg.extra_user_events {
+            trd.check_event(UserEvent(10.into()));
+            trd.check_event(ObjectName);
+            trd.check_event(ObjectName);
+            trd.check_event(UserEvent(8.into()));
+            trd.check_event(ObjectName);
+            trd.check_event(UserEvent(9.into()));
+            trd.check_event(ObjectName);
+            trd.check_event(UserEvent(10.into()));
+            trd.check_event(ObjectName);
+            trd.check_event(UserEvent(11.into()));
+            trd.check_event(ObjectName);
+            trd.check_event(UserEvent(12.into()));
+        }
         trd.check_event(TaskDelay);
         trd.check_event(QueueReceiveBlock);
         trd.check_event(UnusedStack);

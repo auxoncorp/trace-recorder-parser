@@ -41,6 +41,8 @@ pub mod ts_config;
 pub mod unused_stack;
 pub mod user;
 
+pub(crate) const FIXED_USER_EVENT_ID: u16 = 0x98;
+
 #[derive(
     Copy,
     Clone,
@@ -381,6 +383,8 @@ pub enum EventType {
     // Note that user event code range is 0x90..=0x9F
     // Allow for 0-15 arguments (the arg count == word count, always 32 bits) is added to event code
     // num_args = EventCode - 0x90
+    //
+    // This also supports fixed user events (PSF_EVENT_USER_EVENT_FIXED, 0x98..=0x9F)
     #[display(fmt = "USER_EVENT")]
     UserEvent(UserEventArgRecordCount),
 

@@ -779,7 +779,7 @@ impl EventParser {
                 Some((event_code, Event::UnusedStack(event)))
             }
 
-            EventType::UserEvent(arg_count) => {
+            EventType::UserEvent(raw_arg_count) => {
                 // Always expect at least a channel
                 if num_params.0 < 1 {
                     return Err(Error::InvalidEventParameterCount(
@@ -788,6 +788,19 @@ impl EventParser {
                         num_params,
                     ));
                 }
+
+                // Account for fixed user events when can occupy part of the user event ID space
+                let (is_fixed, arg_count) = if event_id.0 >= FIXED_USER_EVENT_ID
+                    && usize::from(raw_arg_count) >= usize::from(num_params)
+                {
+                    (
+                        true,
+                        UserEventArgRecordCount((event_id.0 - FIXED_USER_EVENT_ID) as u8),
+                    )
+                } else {
+                    (false, raw_arg_count)
+                };
+
                 if usize::from(arg_count) >= usize::from(num_params) {
                     return Err(Error::InvalidEventParameterCount(
                         event_code.event_id(),
@@ -803,21 +816,39 @@ impl EventParser {
                     .map(|sym| UserEventChannel::Custom(sym.clone().into()))
                     .unwrap_or(UserEventChannel::Default);
 
-                // arg_count includes the format string, we want the args, if any
-                let not_fmt_str_arg_count = if arg_count.0 != 0 {
-                    usize::from(arg_count) - 1
-                } else {
-                    0
-                };
-                let num_arg_bytes = not_fmt_str_arg_count * 4;
                 self.arg_buf.clear();
-                if num_arg_bytes != 0 {
-                    self.arg_buf.resize(num_arg_bytes, 0);
-                    r.read_exact(&mut self.arg_buf)?;
-                }
 
-                let num_fmt_str_bytes = (usize::from(num_params) - 1 - not_fmt_str_arg_count) * 4;
-                let format_string = self.read_string(&mut r, num_fmt_str_bytes)?;
+                let format_string = if is_fixed {
+                    let fmt_string_handle = object_handle(&mut r, event_id)?;
+                    let format_string = entry_table
+                        .symbol(fmt_string_handle)
+                        .map(|s| TrimmedString(s.to_string()))
+                        .ok_or(Error::FixedUserEventFmtStringLookup(fmt_string_handle))?;
+
+                    let num_arg_bytes = usize::from(arg_count.0) * 4;
+                    if num_arg_bytes != 0 {
+                        self.arg_buf.resize(num_arg_bytes, 0);
+                        r.read_exact(&mut self.arg_buf)?;
+                    }
+
+                    format_string
+                } else {
+                    // arg_count includes the format string, we want the args, if any
+                    let not_fmt_str_arg_count = if arg_count.0 != 0 {
+                        usize::from(arg_count) - 1
+                    } else {
+                        0
+                    };
+                    let num_arg_bytes = not_fmt_str_arg_count * 4;
+                    if num_arg_bytes != 0 {
+                        self.arg_buf.resize(num_arg_bytes, 0);
+                        r.read_exact(&mut self.arg_buf)?;
+                    }
+
+                    let num_fmt_str_bytes =
+                        (usize::from(num_params) - 1 - not_fmt_str_arg_count) * 4;
+                    self.read_string(&mut r, num_fmt_str_bytes)?
+                };
 
                 let (formatted_string, args) = match format_symbol_string(
                     entry_table,

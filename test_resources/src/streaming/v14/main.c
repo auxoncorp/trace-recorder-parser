@@ -280,6 +280,32 @@ int main(int argc, char **argv)
     prvTraceStoreEvent_HandleParam(PSF_EVENT_SEMAPHORE_TAKE_FROMISR, cs, 0);
 
     assert(xTracePrintF(ch, "int %d, unsigned %u", -2, 32) == TRC_SUCCESS);
+    // Exceed the PSF_EVENT_USER_EVENT_FIXED id
+    assert(xTracePrintF(ch, "%u %u %u %u %u %u %u %u %u", 1, 2, 3, 4, 5, 6, 7, 8, 9) == TRC_SUCCESS);
+
+    TraceStringHandle_t ch1;
+    assert(xTraceStringRegister("ch1", &ch1) == TRC_SUCCESS);
+
+    TraceStringHandle_t fmt0;
+    assert(xTraceStringRegister("no args", &fmt0) == TRC_SUCCESS);
+    assert(xTracePrintF0(ch1, fmt0) == TRC_SUCCESS);
+
+    TraceStringHandle_t fmt1;
+    assert(xTraceStringRegister("1 arg: %u", &fmt1) == TRC_SUCCESS);
+    assert(xTracePrintF1(ch1, fmt1, 0) == TRC_SUCCESS);
+
+    TraceStringHandle_t fmt2;
+    assert(xTraceStringRegister("2 args: %u %u", &fmt2) == TRC_SUCCESS);
+    assert(xTracePrintF2(ch1, fmt2, 1, 2) == TRC_SUCCESS);
+
+    TraceStringHandle_t fmt3;
+    assert(xTraceStringRegister("3 args: %u %u %u", &fmt3) == TRC_SUCCESS);
+    assert(xTracePrintF3(ch1, fmt3, 1, 2, 3) == TRC_SUCCESS);
+
+    TraceStringHandle_t fmt4;
+    assert(xTraceStringRegister("4 args: %u %u %u %u", &fmt4) == TRC_SUCCESS);
+    assert(xTracePrintF4(ch1, fmt4, 1, 2, 3, 4) == TRC_SUCCESS);
+
     vTaskDelay(pdMS_TO_TICKS(25));
 
     prvTraceStoreEvent_HandleParamParam(PSF_EVENT_QUEUE_RECEIVE_BLOCK, q, pdMS_TO_TICKS(100), 0);

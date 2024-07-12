@@ -36,6 +36,9 @@ pub enum Error {
     #[error("Found an event with object handle {0} that doesn't exist in the entry table")]
     ObjectLookup(ObjectHandle),
 
+    #[error("Found a fixed user event with format string handle {0} that doesn't exist in the entry table")]
+    FixedUserEventFmtStringLookup(ObjectHandle),
+
     #[error("Found an event ({0}) with an invalid zero value object handle")]
     InvalidObjectHandle(EventId),
 
