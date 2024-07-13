@@ -321,7 +321,18 @@ impl TrimmedString {
         } else {
             &s
         };
-        Self(substr.trim_end_matches(char::from(0)).to_string())
+        Self::from_str(substr.trim_end_matches(char::from(0)))
+    }
+
+    pub(crate) fn from_str(s: &str) -> Self {
+        Self(Self::strip_trailing_newline(s).to_owned())
+    }
+
+    fn strip_trailing_newline(input: &str) -> &str {
+        input
+            .strip_suffix("\r\n")
+            .or(input.strip_suffix('\n'))
+            .unwrap_or(input)
     }
 }
 
@@ -431,6 +442,7 @@ impl From<UserEventArgRecordCount> for usize {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
 #[display(fmt = "{}")]
 pub enum Argument {
+    Char(char),
     I8(i8),
     U8(u8),
     I16(i16),
@@ -549,6 +561,19 @@ pub(crate) fn format_symbol_string<S: SymbolTableExt>(
                         Protocol::Snapshot => r.read_u8()?,
                         Protocol::Streaming => r.read_u32()? as u8,
                     })
+                }
+                // These are not officially supported
+                'p' => Argument::U32(r.read_u32()?),
+                'c' if matches!(protocol, Protocol::Streaming) => {
+                    let raw_c = r.read_u32()?;
+                    let Some(c) = std::char::from_u32(raw_c) else {
+                        warn!("Found invalid '%c' argument in user event format string '{format_string}'");
+                        return Ok((
+                            FormattedString(format_string.to_string()),
+                            Default::default(),
+                        ));
+                    };
+                    Argument::Char(c)
                 }
                 _ => {
                     warn!("Found unsupported format specifier '{in_c}' in user event format string '{format_string}'");

@@ -820,10 +820,6 @@ impl EventParser {
 
                 let format_string = if is_fixed {
                     let fmt_string_handle = object_handle(&mut r, event_id)?;
-                    let format_string = entry_table
-                        .symbol(fmt_string_handle)
-                        .map(|s| TrimmedString(s.to_string()))
-                        .ok_or(Error::FixedUserEventFmtStringLookup(fmt_string_handle))?;
 
                     let num_arg_bytes = usize::from(arg_count.0) * 4;
                     if num_arg_bytes != 0 {
@@ -831,7 +827,27 @@ impl EventParser {
                         r.read_exact(&mut self.arg_buf)?;
                     }
 
-                    format_string
+                    let res = entry_table
+                        .symbol(fmt_string_handle)
+                        .map(|s| TrimmedString::from_str(s))
+                        .ok_or(Error::FixedUserEventFmtStringLookup(fmt_string_handle));
+                    match res {
+                        Ok(fmt_string) => fmt_string,
+                        Err(e) => {
+                            // Need to read out the rest of the arg data so the parser can skip over the
+                            // invalid data
+                            // +2 since we already read channel and fmt string words
+                            let remaining_param_words =
+                                num_params.0.saturating_sub(arg_count.0 + 2);
+                            if remaining_param_words != 0 {
+                                let mut parameters = [0; EventParameterCount::MAX];
+                                r.read_u32_into(
+                                    &mut parameters[..usize::from(remaining_param_words)],
+                                )?;
+                            }
+                            return Err(e);
+                        }
+                    }
                 } else {
                     // arg_count includes the format string, we want the args, if any
                     let not_fmt_str_arg_count = if arg_count.0 != 0 {
