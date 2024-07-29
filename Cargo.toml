@@ -1,6 +1,6 @@
 [package]
 name = "trace-recorder-parser"
-version = "0.17.0"
+version = "0.18.0"
 edition = "2021"
 authors = ["Jon Lamb <jon@auxon.io>"]
 description = "A Rust library to parse Percepio's TraceRecorder data"
