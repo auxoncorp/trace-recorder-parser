@@ -33,6 +33,7 @@ pub struct RecorderData {
     pub recorder_active: bool,
     pub isr_tail_chaining_threshold: u32,
     pub heap_mem_usage: u32,
+    pub heap_mem_max_usage: u32,
     pub is_using_16bit_handles: bool,
     pub object_property_table: ObjectPropertyTable,
     pub symbol_table: SymbolTable,
@@ -89,7 +90,7 @@ impl RecorderData {
             warn!("Kernel port {kernel_port} is not officially supported");
         }
 
-        if minor_version != 6 {
+        if minor_version != 7 {
             warn!("Version {minor_version} is not officially supported");
         }
 
@@ -109,8 +110,7 @@ impl RecorderData {
         let abs_time_last_event_second = r.read_u32()?;
         let recorder_active = r.read_u32()?;
         let isr_tail_chaining_threshold = r.read_u32()?;
-        let mut notused: [u8; 24] = [0; 24];
-        r.read_exact(&mut notused)?;
+        let heap_mem_max_usage = r.read_u32()?;
         let heap_mem_usage = r.read_u32()?;
         DebugMarker::Marker0.read(&mut r)?;
         let is_using_16bit_handles = r.read_u32()? != 0;
@@ -446,6 +446,7 @@ impl RecorderData {
             recorder_active: recorder_active != 0,
             isr_tail_chaining_threshold,
             heap_mem_usage,
+            heap_mem_max_usage,
             is_using_16bit_handles,
             object_property_table: ObjectPropertyTable {
                 queue_object_properties,
