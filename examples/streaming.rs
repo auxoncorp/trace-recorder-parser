@@ -1,6 +1,7 @@
 use clap::Parser;
 use std::collections::BTreeMap;
 use std::{fs::File, io::BufReader, path::PathBuf};
+use tabular::{Row, Table};
 use trace_recorder_parser::streaming::{Error, RecorderData};
 use tracing::{error, warn};
 
@@ -46,6 +47,7 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
 
     if !opts.no_events {
         let mut observed_type_counters = BTreeMap::new();
+        let mut total_count = 0_u64;
 
         loop {
             let (event_code, event) = match rd.read_event(&mut r) {
@@ -67,18 +69,47 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
             let event_type = event_code.event_type();
             println!("{event_type} : {event} : {}", event.event_count());
             *observed_type_counters.entry(event_type).or_insert(0) += 1_u64;
+            total_count += 1;
         }
 
-        println!("----------------------------");
+        println!("--------------------------------------------------------");
+        let mut table = Table::new("{:>}    {:>}    {:<}");
         for (handle, entry) in rd.entry_table.entries().iter() {
-            println!("[{}]: {:?} : {:?}", handle, entry.class, entry.symbol);
-        }
+            let entry_class = if let Some(c) = entry.class {
+                c.to_string()
+            } else {
+                "NA".to_owned()
+            };
+            let entry_sym = if let Some(s) = &entry.symbol {
+                s.as_ref()
+            } else {
+                "NA"
+            };
 
-        println!("----------------------------");
-        for (t, count) in observed_type_counters.into_iter() {
-            println!("  {t} : {count}");
+            table.add_row(
+                Row::new()
+                    .with_cell(handle)
+                    .with_cell(entry_class)
+                    .with_cell(entry_sym),
+            );
         }
-        println!("----------------------------");
+        print!("{table}");
+
+        println!("--------------------------------------------------------");
+        let mut table = Table::new("{:>}    {:>}    {:<}");
+        for (t, count) in observed_type_counters.into_iter() {
+            let percentage = 100.0 * (count as f64 / total_count as f64);
+            table.add_row(
+                Row::new()
+                    .with_cell(count)
+                    .with_cell(format!("{percentage:.01}"))
+                    .with_cell(t),
+            );
+        }
+        print!("{table}");
+
+        println!("--------------------------------------------------------");
+        println!("total: {total_count}");
     }
 
     Ok(())
