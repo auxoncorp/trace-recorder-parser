@@ -47,6 +47,7 @@ fn streaming_v10_smoke() {
         latest_timestamp: Timestamp::zero(),
         high_water_mark: 0,
         extra_user_events: false,
+        custom_printf_event_id: None,
     });
 }
 
@@ -61,6 +62,7 @@ fn streaming_v12_smoke() {
         latest_timestamp: Timestamp::zero(),
         high_water_mark: 0,
         extra_user_events: false,
+        custom_printf_event_id: None,
     });
 }
 
@@ -75,10 +77,11 @@ fn streaming_v13_smoke() {
         latest_timestamp: Timestamp::zero(),
         high_water_mark: 0,
         extra_user_events: false,
+        custom_printf_event_id: None,
     });
 }
 
-// git tag: Tz4/4.8/v4.8.2
+// git tag: Tz4/4.9/v4.9.2
 #[test]
 fn streaming_v14_smoke() {
     common_tests(CommonTestConfig {
@@ -89,6 +92,7 @@ fn streaming_v14_smoke() {
         latest_timestamp: Timestamp::zero(),
         high_water_mark: 0,
         extra_user_events: true,
+        custom_printf_event_id: Some(0x0FA0),
     });
 }
 
@@ -110,13 +114,18 @@ fn streaming_v14_garbage_with_trace_restart() {
         latest_timestamp: Timestamp::zero(),
         high_water_mark: 0,
         extra_user_events: true,
+        custom_printf_event_id: Some(0x0FA0),
     };
     let mut reader = data.as_slice();
 
     let mut rd0 = RecorderData::find(&mut reader).unwrap();
+    if let Some(custom_printf_event_id) = cfg0.custom_printf_event_id {
+        rd0.set_custom_printf_event_id(custom_printf_event_id.into());
+    }
+
     check_recorder_data(&rd0, &cfg0);
 
-    for _ in 0..66 {
+    for _ in 0..64 {
         let _ = rd0.read_event(&mut reader).unwrap().unwrap();
     }
     let next_psf_word = match rd0.read_event(&mut reader) {
@@ -129,9 +138,10 @@ fn streaming_v14_garbage_with_trace_restart() {
         expected_trace_format_version: 14,
         expected_platform_cfg_version_minor: 2,
         initial_event_count: 6,
-        latest_timestamp: Timestamp::from(Ticks::new(65)),
+        latest_timestamp: Timestamp::from(Ticks::new(63)),
         high_water_mark: 4,
         extra_user_events: true,
+        custom_printf_event_id: None,
     };
     let rd1 = RecorderData::read_with_endianness(next_psf_word, &mut reader).unwrap();
     check_recorder_data(&rd1, &cfg1);
@@ -141,8 +151,8 @@ fn streaming_v14_garbage_with_trace_restart() {
         let mut trd = TestRecorderData {
             rd: rd1,
             f: reader,
-            event_cnt: 91,
-            timestamp_ticks: 66,
+            event_cnt: 88,
+            timestamp_ticks: 64,
         };
         trd.check_event(TraceStart);
     }
@@ -156,6 +166,7 @@ struct CommonTestConfig {
     latest_timestamp: Timestamp,
     high_water_mark: u32,
     extra_user_events: bool,
+    custom_printf_event_id: Option<u16>,
 }
 
 fn check_recorder_data(rd: &RecorderData, cfg: &CommonTestConfig) {
@@ -222,7 +233,10 @@ fn check_recorder_data(rd: &RecorderData, cfg: &CommonTestConfig) {
 
 fn common_tests(cfg: CommonTestConfig) {
     let mut f = open_trace_file(cfg.trace_path);
-    let rd = RecorderData::find(&mut f).unwrap();
+    let mut rd = RecorderData::find(&mut f).unwrap();
+    if let Some(custom_printf_event_id) = cfg.custom_printf_event_id {
+        rd.set_custom_printf_event_id(custom_printf_event_id.into());
+    }
 
     check_recorder_data(&rd, &cfg);
 
@@ -284,7 +298,6 @@ fn common_tests(cfg: CommonTestConfig) {
         trd.check_event(SemaphoreTakeFromIsr);
         trd.check_event(UserEvent(3.into()));
         if cfg.extra_user_events {
-            trd.check_event(UserEvent(10.into()));
             trd.check_event(ObjectName);
             trd.check_event(ObjectName);
             trd.check_event(UserEvent(8.into()));
@@ -296,6 +309,9 @@ fn common_tests(cfg: CommonTestConfig) {
             trd.check_event(UserEvent(11.into()));
             trd.check_event(ObjectName);
             trd.check_event(UserEvent(12.into()));
+            if cfg.custom_printf_event_id.is_some() {
+                trd.check_event(Unknown(0x0FA0.into()));
+            }
         }
         trd.check_event(TaskDelay);
         trd.check_event(QueueReceiveBlock);

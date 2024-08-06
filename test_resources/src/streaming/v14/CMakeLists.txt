@@ -31,7 +31,7 @@ endif()
 
 set(
     TRACE_RECORDER_TAG
-    "Tz4/4.8/v4.8.2"
+    "Tz4/4.9/v4.9.2"
     CACHE
     STRING
     "Sets the TraceRecorderSource git tag to use")
@@ -92,6 +92,7 @@ set(
 add_executable(
     ${PROJECT_NAME}
     main.c
+    custom_printf_event.c
     ${TRACING_SOURCES})
 
 target_include_directories(

@@ -1,4 +1,4 @@
-use crate::streaming::event::{Event, EventCode, EventParser};
+use crate::streaming::event::{Event, EventCode, EventId, EventParser};
 use crate::streaming::{EntryTable, Error, HeaderInfo, TimestampInfo};
 use crate::types::{Endianness, Heap, Protocol};
 use std::io::Read;
@@ -60,6 +60,11 @@ impl RecorderData {
 
     pub fn system_heap(&self) -> &Heap {
         self.parser.system_heap()
+    }
+
+    pub fn set_custom_printf_event_id(&mut self, custom_printf_event_id: EventId) {
+        self.parser
+            .set_custom_printf_event_id(custom_printf_event_id);
     }
 
     pub fn read_event<R: Read>(&mut self, r: &mut R) -> Result<Option<(EventCode, Event)>, Error> {

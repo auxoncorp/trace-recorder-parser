@@ -1,6 +1,6 @@
 [package]
 name = "trace-recorder-parser"
-version = "0.18.0"
+version = "0.19.0"
 edition = "2021"
 authors = ["Jon Lamb <jon@auxon.io>"]
 description = "A Rust library to parse Percepio's TraceRecorder data"
@@ -20,10 +20,12 @@ enum-iterator = "2.1"
 # For the examples
 [dev-dependencies]
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+test-log = { version = "0.2", features = ["trace"] }
 clap = { version = "4.5", features = ["derive"] }
 exitcode = "1.1"
 pretty_assertions = "1.4"
 tabular = "0.2"
+clap-num = "1.1"
 
 [target.'cfg(target_family = "unix")'.dev-dependencies]
 # Used to prevent panics on broken pipes.

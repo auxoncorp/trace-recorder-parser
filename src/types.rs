@@ -454,6 +454,20 @@ pub enum Argument {
     String(String),
 }
 
+impl Argument {
+    fn as_i64(&self) -> Option<i64> {
+        Some(match self {
+            Argument::I8(v) => (*v).into(),
+            Argument::U8(v) => (*v).into(),
+            Argument::I16(v) => (*v).into(),
+            Argument::U16(v) => (*v).into(),
+            Argument::I32(v) => (*v).into(),
+            Argument::U32(v) => (*v).into(),
+            _ => return None,
+        })
+    }
+}
+
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Into, Deref, Display)]
 #[display(fmt = "{_0}")]
 pub struct FormatString(pub(crate) String);
@@ -481,6 +495,12 @@ pub enum FormattedStringError {
     Io(#[from] io::Error),
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+enum HexDisplay {
+    Uppercase,
+    Lowercase,
+}
+
 // TODO - float & float endianness support, warn if not supported and found
 // TODO - tests for all this, like '%%' == "%"
 // NOTE Assumes UTF8
@@ -496,6 +516,7 @@ pub(crate) fn format_symbol_string<S: SymbolTableExt>(
     let mut args = Vec::new();
     let mut found_format_specifier = false;
     let mut found_subspec = SubSpecifier::None;
+    let mut is_hex: Option<HexDisplay> = None;
 
     for in_c in format_string.chars() {
         let is_width_or_padding = in_c.is_numeric() || in_c == '#' || in_c == '.';
@@ -516,11 +537,17 @@ pub(crate) fn format_symbol_string<S: SymbolTableExt>(
         } else if found_format_specifier && !is_width_or_padding && in_c == 'b' {
             found_subspec = SubSpecifier::Octet;
         } else if found_format_specifier && !is_width_or_padding {
-            // TODO - add formatting support (x|X hexidecimal, etc)
             let arg = match in_c {
                 'd' if matches!(found_subspec, SubSpecifier::None) => Argument::I32(r.read_i32()?),
                 'u' if matches!(found_subspec, SubSpecifier::None) => Argument::U32(r.read_u32()?),
-                'x' | 'X' => Argument::U32(r.read_u32()?),
+                'x' => {
+                    is_hex = Some(HexDisplay::Lowercase);
+                    Argument::U32(r.read_u32()?)
+                }
+                'X' => {
+                    is_hex = Some(HexDisplay::Uppercase);
+                    Argument::U32(r.read_u32()?)
+                }
                 's' => {
                     let arg_index = ObjectHandle::new(match protocol {
                         Protocol::Snapshot => r.read_u16()?.into(),
@@ -575,6 +602,7 @@ pub(crate) fn format_symbol_string<S: SymbolTableExt>(
                     };
                     Argument::Char(c)
                 }
+                'u' if matches!(found_subspec, SubSpecifier::Long) => Argument::U32(r.read_u32()?),
                 _ => {
                     warn!("Found unsupported format specifier '{in_c}' in user event format string '{format_string}'");
                     return Ok((
@@ -584,11 +612,21 @@ pub(crate) fn format_symbol_string<S: SymbolTableExt>(
                 }
             };
 
-            let _ = write!(formatted_string, "{arg}");
+            let _ = if let Some(integer) = arg.as_i64() {
+                match is_hex {
+                    Some(HexDisplay::Uppercase) => write!(formatted_string, "{integer:X}"),
+                    Some(HexDisplay::Lowercase) => write!(formatted_string, "{integer:x}"),
+                    None => write!(formatted_string, "{arg}"),
+                }
+            } else {
+                write!(formatted_string, "{arg}")
+            };
+
             args.push(arg);
 
             found_format_specifier = false;
             found_subspec = SubSpecifier::None;
+            is_hex = None;
         } else {
             formatted_string.push(in_c);
         }
@@ -658,6 +696,7 @@ impl Heap {
 #[cfg(test)]
 mod test {
     use super::*;
+    use test_log::test;
 
     #[test]
     fn kernel_version_endianess_identity() {
@@ -883,6 +922,36 @@ mod test {
             (
                 FormattedString(out.to_string()),
                 vec![Argument::String(symbol.0)]
+            )
+        );
+
+        let fmt = "ip_input: iphdr->dest 0x%lu netif->ip_addr 0x%lu (0x%lX, 0x%03lX, 0x%02lx)";
+        let out = "ip_input: iphdr->dest 0x1 netif->ip_addr 0x2 (0x3, 0xFE, 0xff)";
+        let arg_bytes: Vec<u8> = u32::to_le_bytes(1)
+            .into_iter()
+            .chain(u32::to_le_bytes(2))
+            .chain(u32::to_le_bytes(3))
+            .chain(u32::to_le_bytes(0xFE))
+            .chain(u32::to_le_bytes(0xFF))
+            .collect();
+        assert_eq!(
+            format_symbol_string(
+                &sr_st,
+                Protocol::Streaming,
+                Endianness::Little,
+                fmt,
+                &arg_bytes
+            )
+            .unwrap(),
+            (
+                FormattedString(out.to_string()),
+                vec![
+                    Argument::U32(1),
+                    Argument::U32(2),
+                    Argument::U32(3),
+                    Argument::U32(0xFE),
+                    Argument::U32(0xFF),
+                ]
             )
         );
     }

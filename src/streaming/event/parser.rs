@@ -18,6 +18,9 @@ pub struct EventParser {
     /// Initial heap from the entry table, maintained by the parser
     heap: Heap,
 
+    /// Event ID for custom printf events, if enabled
+    custom_printf_event_id: Option<EventId>,
+
     /// Local scratch buffer for reading strings
     buf: Vec<u8>,
 
@@ -30,9 +33,14 @@ impl EventParser {
         Self {
             endianness: byteordered::Endianness::from(endianness),
             heap,
+            custom_printf_event_id: None,
             buf: Vec::with_capacity(256),
             arg_buf: Vec::with_capacity(256),
         }
+    }
+
+    pub fn set_custom_printf_event_id(&mut self, custom_printf_event_id: EventId) {
+        self.custom_printf_event_id = Some(custom_printf_event_id);
     }
 
     pub fn system_heap(&self) -> &Heap {
@@ -876,6 +884,66 @@ impl EventParser {
                     Ok((fs, args)) => (fs, args),
                     Err(e) => {
                         error!("Failed to parse user event format string arguments, using the raw symbol instead. {e}");
+                        (
+                            FormattedString(format_string.clone().into()),
+                            Default::default(),
+                        )
+                    }
+                };
+
+                let event = UserEvent {
+                    event_count,
+                    timestamp,
+                    channel,
+                    format_string: FormatString(format_string.0),
+                    formatted_string,
+                    args,
+                };
+                Some((event_code, Event::User(event)))
+            }
+
+            EventType::Unknown(_)
+                if self
+                    .custom_printf_event_id
+                    .map(|id| id == event_id)
+                    .unwrap_or(false) =>
+            {
+                if num_params.0 != 0 {
+                    return Err(Error::InvalidEventParameterCount(
+                        event_code.event_id(),
+                        0,
+                        num_params,
+                    ));
+                }
+
+                let channel_handle = object_handle(&mut r, event_id)?;
+                let channel = entry_table
+                    .symbol(channel_handle)
+                    .map(|sym| UserEventChannel::Custom(sym.clone().into()))
+                    .unwrap_or(UserEventChannel::Default);
+
+                let args_len = r.read_u16()?;
+                let fmt_len = r.read_u16()?;
+
+                self.arg_buf.clear();
+                let num_arg_bytes = usize::from(args_len) * 4;
+                if num_arg_bytes != 0 {
+                    self.arg_buf.resize(num_arg_bytes, 0);
+                    r.read_exact(&mut self.arg_buf)?;
+                }
+
+                let format_string = self.read_string(&mut r, fmt_len.into())?;
+
+                let (formatted_string, args) = match format_symbol_string(
+                    entry_table,
+                    Protocol::Streaming,
+                    self.endianness.into(),
+                    &format_string,
+                    &self.arg_buf,
+                ) {
+                    Ok((fs, args)) => (fs, args),
+                    Err(e) => {
+                        error!("Failed to parse custom printf event format string arguments, using the raw symbol instead. {e}");
                         (
                             FormattedString(format_string.clone().into()),
                             Default::default(),

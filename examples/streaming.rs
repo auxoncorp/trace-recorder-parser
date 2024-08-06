@@ -12,6 +12,10 @@ pub struct Opts {
     #[clap(long)]
     pub no_events: bool,
 
+    /// TODO
+    #[clap(long, value_parser=clap_num::maybe_hex::<u16>)]
+    pub custom_printf_event_id: Option<u16>,
+
     /// Path to streaming data file
     #[clap(value_parser)]
     pub path: PathBuf,
@@ -43,6 +47,11 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
     let mut r = BufReader::new(f);
 
     let mut rd = RecorderData::find(&mut r)?;
+
+    if let Some(custom_printf_event_id) = opts.custom_printf_event_id {
+        rd.set_custom_printf_event_id(custom_printf_event_id.into());
+    }
+
     println!("{rd:#?}");
 
     if !opts.no_events {

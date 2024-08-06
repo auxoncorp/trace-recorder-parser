@@ -18,11 +18,15 @@
 #error "Set TRC_CFG_USE_TRACE_ASSERT=1"
 #endif
 
+void custom_printf(const char* fmt, ...) __attribute__ ((format (printf, 1, 2)));;
+
 static TraceBaseType_t g_timer_ticks = 0;
 static TraceStreamPortFile_t* g_trace_file = NULL;
 static TraceUnsignedBaseType_t g_heap = 0xFF00;
 
 static int g_trace_append_mode = 0;
+
+TraceStringHandle_t g_log_ch = 0;
 
 static void* not_traced_heap_ptr(void)
 {
@@ -281,7 +285,7 @@ int main(int argc, char **argv)
 
     assert(xTracePrintF(ch, "int %d, unsigned %u", -2, 32) == TRC_SUCCESS);
     // Exceed the PSF_EVENT_USER_EVENT_FIXED id
-    assert(xTracePrintF(ch, "%u %u %u %u %u %u %u %u %u", 1, 2, 3, 4, 5, 6, 7, 8, 9) == TRC_SUCCESS);
+    assert(xTracePrintF(ch, "%u %u %u %u %u %u %u %u %u", 1, 2, 3, 4, 5, 6, 7, 8, 9) == TRC_FAIL);
 
     TraceStringHandle_t ch1;
     assert(xTraceStringRegister("ch1", &ch1) == TRC_SUCCESS);
@@ -305,6 +309,10 @@ int main(int argc, char **argv)
     TraceStringHandle_t fmt4;
     assert(xTraceStringRegister("4 args: %u %u %u %u", &fmt4) == TRC_SUCCESS);
     assert(xTracePrintF4(ch1, fmt4, 1, 2, 3, 4) == TRC_SUCCESS);
+
+    // Custom printf event
+    g_log_ch = ch;
+    custom_printf("this is a very %d long %u statement with 0x%04X in hex 0x:%x", -1, 2, 0xFF, 0xFE);
 
     vTaskDelay(pdMS_TO_TICKS(25));
 
