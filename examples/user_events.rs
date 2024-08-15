@@ -58,6 +58,9 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
                 Error::TraceRestarted(psf_start_word_endianness) => {
                     warn!("Detected a restarted trace stream");
                     rd = RecorderData::read_with_endianness(psf_start_word_endianness, &mut r)?;
+                    if let Some(custom_printf_event_id) = opts.custom_printf_event_id {
+                        rd.set_custom_printf_event_id(custom_printf_event_id.into());
+                    }
                     continue;
                 }
                 _ => {
