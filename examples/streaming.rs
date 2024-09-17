@@ -2,7 +2,7 @@ use clap::Parser;
 use std::collections::BTreeMap;
 use std::{fs::File, io::BufReader, path::PathBuf};
 use tabular::{Row, Table};
-use trace_recorder_parser::streaming::{Error, RecorderData};
+use trace_recorder_parser::streaming::{event::TrackingEventCounter, Error, RecorderData};
 use tracing::{error, warn};
 
 #[derive(Parser, Debug, Clone)]
@@ -57,6 +57,9 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
     if !opts.no_events {
         let mut observed_type_counters = BTreeMap::new();
         let mut total_count = 0_u64;
+        let mut event_counter_tracker = TrackingEventCounter::zero();
+        let mut first_event_observed = false;
+        let mut total_dropped_events = 0_u64;
 
         loop {
             let (event_code, event) = match rd.read_event(&mut r) {
@@ -65,6 +68,7 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
                 Err(e) => match e {
                     Error::TraceRestarted(psf_start_word_endianness) => {
                         warn!("Detected a restarted trace stream");
+                        first_event_observed = false;
                         rd = RecorderData::read_with_endianness(psf_start_word_endianness, &mut r)?;
                         if let Some(custom_printf_event_id) = opts.custom_printf_event_id {
                             rd.set_custom_printf_event_id(custom_printf_event_id.into());
@@ -78,10 +82,26 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             };
 
+            let dropped_events = if !first_event_observed {
+                event_counter_tracker.set_initial_count(event.event_count());
+                first_event_observed = true;
+                None
+            } else {
+                event_counter_tracker.update(event.event_count())
+            };
+
             let event_type = event_code.event_type();
             println!("{event_type} : {event} : {}", event.event_count());
             *observed_type_counters.entry(event_type).or_insert(0) += 1_u64;
             total_count += 1;
+
+            if let Some(dropped_events) = dropped_events {
+                warn!(
+                    event_count = u16::from(event.event_count()),
+                    dropped_events, "Dropped events detected"
+                );
+                total_dropped_events += dropped_events;
+            }
         }
 
         println!("--------------------------------------------------------");
@@ -122,6 +142,7 @@ fn do_main() -> Result<(), Box<dyn std::error::Error>> {
 
         println!("--------------------------------------------------------");
         println!("total: {total_count}");
+        println!("dropped: {total_dropped_events}");
     }
 
     Ok(())
